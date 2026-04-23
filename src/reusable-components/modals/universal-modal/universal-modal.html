@@ -1,0 +1,86 @@
+<div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>{{ title }}</h2>
+            <button class="close-btn" (click)="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+            @if (contentType === 'terms') {
+                <p class="last-updated">Last Updated: April 15, 2026</p>
+                <p>Welcome to ScamStop. These Terms and Conditions ("Terms") govern your use of the ScamStop application and services. By accessing or using our platform, you agree to be bound by these Terms. If you do not agree, please refrain from using the application.</p>
+                
+                <h3>1. Service Description</h3>
+                <p>ScamStop is a research-based, community-driven mobile application designed to identify and report potential SMS scams (smishing). The service operates by analyzing user-submitted message content and metadata to alert other community members of potential threats.</p>
+                
+                <h3>2. User Privacy & Data Protection</h3>
+                <p>In accordance with the Philippine Data Privacy Act of 2012 (RA 10173), we are committed to protecting your personal information.</p>
+                <p><strong>Data Collection:</strong> When you report a message, ScamStop collects the sender's number and the message content.</p>
+                <p><strong>Anonymization:</strong> Your personal identity as a reporter is kept confidential and is not shared with other users.</p>
+                <p><strong>Usage:</strong> Collected data is used solely for the purpose of improving threat detection and warning the community.</p>
+                
+                <h3>3. Community Conduct & Reporting</h3>
+                <p>To maintain the integrity of our detection network, users agree to the following:</p>
+                <p><strong>Truthfulness:</strong> Users must only report messages they honestly believe to be fraudulent or malicious.</p>
+                <p><strong>Prohibited Use:</strong> Users shall not use the reporting feature to harass individuals or flag legitimate business communications maliciously.</p>
+                <p><strong>Accountability:</strong> Systemic abuse of the reporting function may lead to a permanent ban from the service.</p>
+                
+                <h3>4. Disclaimers and Limitation of Liability</h3>
+                <p><strong>Important:</strong> ScamStop is an advisory tool. It does not provide legal or financial advice.</p>
+                <p>While ScamStop strives for high accuracy in identifying smishing attempts, we do not guarantee that the service will identify all potential threats or that all flagged messages are definitively fraudulent.</p>
+                <p><strong>User Judgment:</strong> The final decision to open a link or reply to a sender rests entirely with the user.</p>
+                <p><strong>Liability:</strong> Developers and proponents of ScamStop shall not be liable for any financial losses, data breaches, or damages resulting from the use or reliance on the application.</p>
+                
+                <h3>5. Intellectual Property</h3>
+                <p>All software, algorithms, data visualizations, and branding associated with ScamStop are the intellectual property of the project developers. Users may not decompile, reverse engineer, or redistribute the application without express written consent.</p>
+                
+                <h3>6. Academic Research Context</h3>
+                <p>ScamStop is currently part of an academic research project focused on security in Olongapo City. By using the app, you acknowledge that your anonymized data may be used for statistical analysis and academic documentation.</p>
+                
+                <h3>7. Amendments</h3>
+                <p>We reserve the right to modify these terms at any time. Significant changes will be communicated via in-app notifications. Continued use of the app after such changes constitutes acceptance of the new terms.</p>
+                
+                <p class="footer-text">Developed for the community of Olongapo City.<br>© 2026 Ambergris Team. All Rights Reserved.</p>
+            }
+            @if (contentType === 'privacy') {
+                <h3>Information We Collect</h3>
+                <p>We collect information you provide directly to us, including personal information such as name, email, and phone number.</p>
+                
+                <h3>How We Use Your Information</h3>
+                <p>We use the information we collect to provide, maintain, and improve our services, and to communicate with you.</p>
+                
+                <h3>Data Security</h3>
+                <p>We implement appropriate security measures to protect your personal information against unauthorized access.</p>
+                
+                <h3>Your Rights</h3>
+                <p>You have the right to access, update, or delete your personal information at any time.</p>
+            }
+            @if (contentType === 'about') {
+                <h3>About ScamStop</h3>
+                <p>ScamStop is a scam detection application designed to help users identify and avoid various types of scams.</p>
+                
+                <h3>Our Mission</h3>
+                <p>To protect individuals from falling victim to scams through education and advanced detection tools.</p>
+                
+                <h3>Version</h3>
+                <p>ScamStop v1.0.0</p>
+            }
+            @if (contentType === 'help') {
+                <h3>How to Use ScamStop</h3>
+                <p>1. Enter suspicious information in the detection field</p>
+                <p>2. Click "Analyze" to check for potential scams</p>
+                <p>3. Review the analysis results and recommendations</p>
+                
+                <h3>Need More Help?</h3>
+                <p>Contact our support team for additional assistance.</p>
+            }
+            @if (contentType === 'custom') {
+                <p>{{ customContent }}</p>
+            }
+        </div>
+        @if (showAcceptButton) {
+            <div class="modal-footer">
+                <button class="accept-btn" (click)="acceptTerms()">{{ acceptButtonText }}</button>
+            </div>
+        }
+    </div>
+</div>

@@ -1,1 +1,28 @@
-/* You can add global styles to this file, and also import other style files */
+@import url('https://fonts.googleapis.com/css2?family=Quantico:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+
+body{
+    background-color: #1E3A62;
+    margin: 0;
+}
+.btn1{
+    font-family: "Quantico", sans-serif;
+    background-color: white;
+    color: #1E3A62;
+    border: 1px solid #1E3A62;
+    border-radius: 5px;
+    padding: 10px 20px;
+    cursor: pointer;
+}
+
+u{
+    cursor: pointer;
+}
+
+/* for chrome extension */
+/* html, body {
+    width: 400px;
+    height: 800px;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+} */

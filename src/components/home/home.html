@@ -1,0 +1,113 @@
+<div class="home-container">
+  <!-- Header Section -->
+  <div class="dashboard-header">
+    <h1>🛡️ ScamStop Dashboard</h1>
+    <p class="subtitle">Your protection against online scams</p>
+    
+    @if (extensionInstalled()) {
+      <div class="extension-status connected">
+        <span class="status-dot"></span>
+        Extension Connected
+      </div>
+    } @else {
+      <div class="extension-status disconnected">
+        <span class="status-dot"></span>
+        Extension Not Installed
+      </div>
+    }
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">🚨</div>
+      <div class="stat-value">{{ detections() }}</div>
+      <div class="stat-label">Scams Detected</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📋</div>
+      <div class="stat-value">{{ reports().length }}</div>
+      <div class="stat-label">Reports Sent</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🚫</div>
+      <div class="stat-value">{{ blacklist().length }}</div>
+      <div class="stat-label">Blacklisted</div>
+    </div>
+  </div>
+
+  <!-- Traffic Light System -->
+  <div class="traffic-light-section">
+    <h2>🚦 Scam Detection Status</h2>
+    <div class="traffic-lights">
+      <div class="light-item">
+        <div class="light-circle red"></div>
+        <span class="light-label">High Risk</span>
+        <span class="light-range">70-100%</span>
+      </div>
+      <div class="light-item">
+        <div class="light-circle yellow"></div>
+        <span class="light-label">Caution</span>
+        <span class="light-range">30-69%</span>
+      </div>
+      <div class="light-item">
+        <div class="light-circle green"></div>
+        <span class="light-label">Safe</span>
+        <span class="light-range">0-29%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Blacklist Section -->
+  <div class="blacklist-section">
+    <h2>📵 Scammer Blacklist</h2>
+    @if (blacklist().length === 0) {
+      <div class="empty-state">
+        <p>No blacklisted numbers yet</p>
+        <p class="hint">Numbers added from the extension will appear here</p>
+      </div>
+    } @else {
+      <div class="blacklist-list">
+        @for (entry of blacklist(); track entry.number) {
+          <div class="blacklist-item">
+            <div class="blacklist-info">
+              <span class="blacklist-number">{{ entry.number }}</span>
+              <span class="blacklist-date">Added {{ entry.addedAt | date:'short' }}</span>
+            </div>
+            <button class="remove-btn" (click)="removeFromBlacklist(entry.number)">×</button>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Recent Reports Section -->
+  <div class="reports-section">
+    <h2>📨 Recent Reports</h2>
+    @if (reports().length === 0) {
+      <div class="empty-state">
+        <p>No reports submitted yet</p>
+        <p class="hint">Use the extension to report suspicious messages</p>
+      </div>
+    } @else {
+      <div class="reports-list">
+        @for (report of reports().slice(-5).reverse(); track $index) {
+          <div class="report-item">
+            <div class="report-info">
+              <span class="report-number">{{ report.number }}</span>
+              <span class="report-message">{{ report.message | slice:0:50 }}...</span>
+            </div>
+            <span class="report-status" [class]="report.status">{{ report.status }}</span>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="quick-actions">
+    <button class="action-btn danger" (click)="clearAllData()">
+      🗑️ Clear All Data
+    </button>
+  </div>
+</div>

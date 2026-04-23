@@ -1,0 +1,26 @@
+{
+    "manifest_version": 3,
+    "name": "ScamStop",
+    "version": "1.0",
+    "description": "ScamStop is a scam detection application designed to help users identify and avoid various types of scams.",
+    "permissions": [
+        "activeTab",
+        "tabs"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "action": {
+        "default_title": "ScamStop",
+        "default_popup": "index.html"
+    },
+    "host_permissions": [
+        "<all_urls>"
+    ],
+    "content_scripts": [
+        {
+            "matches": ["<all_urls>"],
+            "js": ["content.js"]
+        }
+    ]
+}

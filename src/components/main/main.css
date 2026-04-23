@@ -1,0 +1,33 @@
+.main-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background-color: #d1d1d6;
+}
+
+.content {
+    flex: 1;
+    padding: 20px;
+    min-height: 100vh;
+    margin-bottom: 70px;
+}
+
+.fade-wrapper {
+    width: 100%;
+    height: 100%;
+}
+
+.animate {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

@@ -1,0 +1,30 @@
+<div id="upper">
+    <img src="/assets/scamstop.svg" alt="scamstop logo" id="sclogo">
+    <button class="btn1" (click)="goToMain()">Get Started</button>
+    <div class="terms">
+        <p>By proceeding, you agree to our <u (click)="openTermsModal()">Terms and Conditions</u>
+    </div>
+</div>
+<div class="pnp_container">
+    <img src="/assets/Philippine_National_Police_seal.svg" id="pnpImage">
+    <p>In partnership with the Philippine National Police</p>
+</div>
+
+<app-universal-modal 
+    *ngIf="showModal" 
+    title="Terms and Conditions"
+    contentType="terms"
+    [showAcceptButton]="false"
+    (close)="closeModal()" 
+    (accept)="acceptTerms()">
+</app-universal-modal>
+
+
+<!-- Terms -->
+<!-- <app-universal-modal contentType="terms" title="Terms and Conditions" ...></app-universal-modal> -->
+
+<!-- Privacy -->
+<!-- <app-universal-modal contentType="privacy" title="Privacy Policy" ...></app-universal-modal> -->
+
+<!-- Custom content -->
+<!-- <app-universal-modal contentType="custom" customContent="Your custom message" ...></app-universal-modal> -->

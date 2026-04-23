@@ -1,0 +1,149 @@
+.sidebar {
+    width: 100%;
+    height: 70px;
+    background-color: #1a1a2e;
+    border-top: 1px solid #333;
+    display: flex;
+    flex-direction: row;
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    z-index: 100;
+}
+
+.nav-menu {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100%;
+}
+
+.nav-menu li {
+    border: none;
+    flex: 1;
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: #ccc;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    height: 100%;
+    width: 100%;
+}
+
+.nav-item:hover {
+    background-color: #2a2a4e;
+    color: #fff;
+}
+
+.nav-item.active {
+    background-color: #4caf50;
+    color: #fff;
+}
+
+.nav-icon {
+    font-size: 20px;
+    margin: 0;
+}
+
+.nav-text {
+    font-size: 10px;
+    font-family: 'Quantico', sans-serif;
+    margin-top: 3px;
+    align-items: center;
+    justify-content: center;
+}
+
+.burger-btn:hover {
+    color: #4caf50;
+}
+
+.sidebar-logo {
+    width: 80%;
+    max-width: 150px;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar.collapsed .sidebar-logo {
+    display: none;
+}
+
+.nav-menu {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+}
+
+.sidebar.expanded .nav-menu {
+    flex-direction: column;
+    justify-content: flex-start;
+    padding-top: 20px;
+}
+
+.nav-menu li {
+    border: none;
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    color: #ccc;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    flex: 1;
+    height: 100%;
+}
+
+.sidebar.expanded .nav-item {
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 15px 20px;
+    width: 100%;
+}
+
+.nav-item:hover {
+    background-color: #2a2a4e;
+    color: #fff;
+}
+
+.nav-item.active {
+    background-color: #4caf50;
+    color: #fff;
+}
+
+.nav-icon {
+    font-size: 24px;
+    margin: 0;
+}
+
+.sidebar.expanded .nav-icon {
+    margin-right: 15px;
+}
+
+.nav-text {
+    font-size: 12px;
+    font-family: 'Quantico', sans-serif;
+    margin-top: 5px;
+}
+
+.sidebar.expanded .nav-text {
+    margin-top: 0;
+    font-size: 16px;
+}
