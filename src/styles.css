@@ -19,10 +19,10 @@ u{
 }
 
 /* for chrome extension */
-/* html, body {
+html, body {
     width: 400px;
-    height: 800px;
-    overflow: hidden;
+    height: 600px;
+    
     margin: 0;
     padding: 0;
-} */
+}

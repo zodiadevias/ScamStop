@@ -9,6 +9,7 @@
     left: 0;
     bottom: 0;
     z-index: 100;
+    --keyboard-overlap: 0px;
 }
 
 .nav-menu {
@@ -39,10 +40,10 @@
     width: 100%;
 }
 
-.nav-item:hover {
+/* .nav-item:hover {
     background-color: #2a2a4e;
     color: #fff;
-}
+} */
 
 .nav-item.active {
     background-color: #4caf50;
@@ -118,14 +119,16 @@
     width: 100%;
 }
 
-.nav-item:hover {
+/* .nav-item:hover {
     background-color: #2a2a4e;
     color: #fff;
-}
+} */
 
 .nav-item.active {
     background-color: #4caf50;
     color: #fff;
+    border-radius: 10px;
+    width: 80%;
 }
 
 .nav-icon {
@@ -146,4 +149,17 @@
 .sidebar.expanded .nav-text {
     margin-top: 0;
     font-size: 16px;
+}
+
+.icons{
+    width: 30px;
+    height: 30px;
+    margin-top: 10px;
+}
+
+@media (max-width: 768px) {
+    body.keyboard-open .sidebar {
+        bottom: calc(-1 * var(--keyboard-overlap, 0px));
+        pointer-events: none;
+    }
 }

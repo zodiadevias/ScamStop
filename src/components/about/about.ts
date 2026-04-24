@@ -1,5 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-about',
@@ -9,6 +10,7 @@ import { CommonModule } from '@angular/common';
   styleUrl: './about.css',
 })
 export class About {
+  private readonly onboardingSeenKey = 'scamstop_onboarding_seen';
   showTerms = signal(false);
   showPrivacy = signal(false);
 
@@ -50,11 +52,18 @@ export class About {
     { name: 'Olongapo City', icon: '🏙️', description: 'Local Government' }
   ];
 
+  constructor(private router: Router) {}
+
   toggleTerms() {
     this.showTerms.set(!this.showTerms());
   }
 
   togglePrivacy() {
     this.showPrivacy.set(!this.showPrivacy());
+  }
+
+  resetOnboarding() {
+    localStorage.removeItem(this.onboardingSeenKey);
+    this.router.navigateByUrl('/');
   }
 }

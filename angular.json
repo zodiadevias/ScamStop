@@ -22,6 +22,11 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "**/*",
+                "input": "browser-extension",
+                "output": "."
               }
             ],
             "styles": [
