@@ -3,6 +3,7 @@
 body{
     background-color: #1E3A62;
     margin: 0;
+    
 }
 .btn1{
     font-family: "Quantico", sans-serif;
@@ -19,10 +20,10 @@ u{
 }
 
 /* for chrome extension */
-html, body {
+/* html, body {
     width: 400px;
-    height: 600px;
+    height: 500px;
     
     margin: 0;
     padding: 0;
-}
+} */

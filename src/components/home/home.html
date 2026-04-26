@@ -14,4 +14,25 @@
             <button (click)="toggleScanning()" class="btn1">Turn ON</button>
         </div>
     }
+
 </div>
+
+<div class="home-grid">
+    <div class="grid-card">
+        <h3>Scanned</h3>
+        <p >{{totalScanned}}</p>
+    </div>
+    <div class="grid-card">
+        <h3>Flagged</h3>
+        <p>{{totalFlagged}}</p>
+    </div>
+    <div class="grid-card">
+        <h3>Safe</h3>
+        <p>{{totalSafe}}</p>
+    </div>
+    <div class="grid-card full-width">
+        <h3>Recent Detections</h3>
+        <p class="recent">Detected content will be highlighted on web pages and stored in the extension history for review.</p>
+    </div>
+</div>
+

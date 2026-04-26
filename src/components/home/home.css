@@ -58,6 +58,52 @@ p{
         font-size: 15px;
     }
 }
+.home-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(100px, 1fr));
+    margin-top: 2rem;
+    
+    max-width: 1200px;
+    
+}
+
+.grid-card {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 1rem;
+    min-height: 100px;
+    box-sizing: border-box;
+}
+
+.grid-card p {
+    color: white;
+    font-family: sans-serif;
+    text-align: center;
+    font-size: clamp(12px, 3vw, 16px);
+    font-weight: bold;
+}
+
+.grid-card h3 {
+    color: white;
+    font-family: sans-serif;
+    text-align: center;
+    font-size: clamp(16px, 3vw, 20px);
+}
+
+.grid-card.full-width {
+    grid-column: 1 / -1;
+}
+
+.grid-card h3 {
+    margin-top: 0;
+}
+
+.numbers{
+    font-size: large;
+    font-weight: bold;
+}
+
+
 
 @media (min-width: 481px) and (max-width: 768px) {
     .shield img {

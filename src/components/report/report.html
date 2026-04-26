@@ -1,157 +1,30 @@
-<div class="report-container">
-  <div class="report-header">
-    <h1>📨 Report a Scam</h1>
-    <p class="subtitle">Help fight scams by reporting suspicious messages to PNP</p>
-  </div>
+<div class="report-page">
+  <section class="hero">
+    <p class="eyebrow">Report Scam</p>
+    <h1>Submit a scam report</h1>
+    <p>Tell us about the suspicious message, website, or activity so ScamStop can learn and protect more users.</p>
+  </section>
 
-  @if (!scamDetection.modelAvailable()) {
-    <div class="model-warning">
-      ⚠️ AI model backend is unavailable. The app is using fallback scam detection.
+  <form class="report-form" (submit)="submitReport(); $event.preventDefault();">
+    <label for="report-text">Describe the scam</label>
+    <textarea
+      id="report-text"
+      placeholder="Paste the suspicious message, URL, or scam details here"
+      [value]="reportText()"
+      (input)="reportText.set($any($event.target).value)"
+      rows="10"
+      autocomplete="off"
+    ></textarea>
+
+    <div class="actions">
+      <button type="submit" [disabled]="submitting() || !reportText().trim()">
+        {{ submitting() ? 'Submitting...' : 'Submit report' }}
+      </button>
     </div>
-  }
 
-  <!-- Report Form -->
-  <div class="report-form-card">
-    @if (submitted()) {
-      <div class="success-message">
-        <div class="success-icon">✅</div>
-        <h3>Report Submitted!</h3>
-        <p>Thank you for helping fight scams. PNP will review your report.</p>
-      </div>
-    } @else {
-      <form (ngSubmit)="submitReport()">
-        <!-- Platform Selection -->
-        <div class="form-group">
-          <label>Platform</label>
-          <div class="platform-grid">
-            @for (p of platforms; track p.value) {
-              <button 
-                type="button"
-                class="platform-btn" 
-                [class.active]="platform() === p.value"
-                (click)="platform.set(p.value)"
-              >
-                <span class="platform-icon">{{ p.icon }}</span>
-                <span class="platform-label">{{ p.label }}</span>
-              </button>
-            }
-          </div>
-        </div>
+    <p *ngIf="successMessage()" class="notice success">{{ successMessage() }}</p>
+    <p *ngIf="errorMessage()" class="notice error">{{ errorMessage() }}</p>
 
-        <!-- Phone Number -->
-        <div class="form-group">
-          <label for="phone">Phone Number / Sender</label>
-          <input 
-            type="tel" 
-            id="phone"
-            [ngModel]="phoneNumber()" 
-            (ngModelChange)="phoneNumber.set($event)"
-            name="phone"
-            placeholder="+63 912 345 6789"
-            class="form-input"
-          />
-        </div>
-
-        <!-- Message -->
-        <div class="form-group">
-          <label for="message">Suspicious Message</label>
-          <textarea 
-            id="message"
-            [ngModel]="message()" 
-            (ngModelChange)="onMessageChange($event)"
-            name="message"
-            placeholder="Paste the suspicious message here..."
-            rows="5"
-            class="form-input"
-          ></textarea>
-          
-          <!-- AI Detection Result -->
-          @if (isDetecting()) {
-            <div class="detection-loading">
-              <span class="loading-spinner"></span>
-              Analyzing message...
-            </div>
-          }
-          
-          @if (detectionResult(); as result) {
-            <div class="detection-result" [style.border-color]="getTrafficLightColor(result.scam_probability)">
-              <div class="detection-header">
-                <span class="detection-icon">
-                  @if (result.scam_probability >= 70) {
-                    🚨
-                  } @else if (result.scam_probability >= 30) {
-                    ⚠️
-                  } @else {
-                    ✅
-                  }
-                </span>
-                <span class="detection-label" [style.color]="getTrafficLightColor(result.scam_probability)">
-                  {{ getTrafficLightLabel(result.scam_probability) }}
-                </span>
-                <span class="detection-confidence">{{ result.scam_probability }}%</span>
-              </div>
-              <div class="detection-bar">
-                <div class="detection-bar-fill" 
-                  [style.width.%]="result.scam_probability"
-                  [style.background]="getTrafficLightColor(result.scam_probability)"
-                ></div>
-              </div>
-            </div>
-          }
-        </div>
-
-        <!-- Submit Button -->
-        <button 
-          type="submit" 
-          class="submit-btn"
-          [disabled]="isSubmitting()"
-        >
-          @if (isSubmitting()) {
-            <span class="loading-spinner"></span>
-            Submitting...
-          } @else {
-            📤 Submit Report to PNP
-          }
-        </button>
-      </form>
-    }
-  </div>
-
-  <!-- Reports History -->
-  <div class="reports-history">
-    <h2>📋 Your Reports</h2>
-    @if (reports().length === 0) {
-      <div class="empty-state">
-        <p>No reports submitted yet</p>
-      </div>
-    } @else {
-      <div class="reports-list">
-        @for (report of reports(); track $index; let i = $index) {
-          <div class="report-card">
-            <div class="report-header-row">
-              <span class="report-platform">{{ report.platform }}</span>
-              <span class="report-status" [class]="getStatusClass(report.status)">
-                {{ report.status }}
-              </span>
-            </div>
-            <div class="report-number">{{ report.number }}</div>
-            <div class="report-message">{{ report.message }}</div>
-            <div class="report-footer">
-              <span class="report-date">{{ report.timestamp | date:'short' }}</span>
-              <button class="delete-btn" (click)="deleteReport(i)">🗑️</button>
-            </div>
-          </div>
-        }
-      </div>
-    }
-  </div>
-
-  <!-- PNP Notice -->
-  <div class="pnp-notice">
-    <div class="notice-icon">🏛️</div>
-    <div class="notice-text">
-      <strong>Philippine National Police</strong>
-      <p>Reports are submitted to PNP's Cybercrime Unit for investigation.</p>
-    </div>
-  </div>
+    <p class="hint">Your report helps improve ScamStop and can be used to refine scam detection models.</p>
+  </form>
 </div>

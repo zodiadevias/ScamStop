@@ -43,4 +43,13 @@ export class Home implements OnInit {
       this.animateShield.set(true);
     });
   }
+
+
+  totalScanned = 2000;
+  totalFlagged = 1000;
+  totalSafe = 1000;
+
+
+
+
 }
