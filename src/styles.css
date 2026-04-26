@@ -1,9 +1,23 @@
 @import url('https://fonts.googleapis.com/css2?family=Quantico:ital,wght@0,400;0,700;1,400;1,700&display=swap');
 
 body{
-    background-color: #1E3A62;
+    background: #111827;
     margin: 0;
     
+}
+
+body.light-mode {
+    background: #f8fafc;
+}
+
+body.light-mode * {
+    color: #000 !important;
+}
+
+body.light-mode input::placeholder,
+body.light-mode textarea::placeholder {
+    color: #000 !important;
+    opacity: 0.75;
 }
 .btn1{
     font-family: "Quantico", sans-serif;
@@ -22,7 +36,7 @@ u{
 /* for chrome extension */
 /* html, body {
     width: 400px;
-    height: 500px;
+    height: 600px;
     
     margin: 0;
     padding: 0;

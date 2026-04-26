@@ -3,7 +3,7 @@ import { Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 const DEFAULT_SETTINGS = {
-  enabled: true,
+  enabled: false,
   apiBase: 'http://127.0.0.1:3000'
 };
 

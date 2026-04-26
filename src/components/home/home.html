@@ -1,38 +1,62 @@
-<div class="home-page">
+<div class="home-layout">
+  <div class="home-page">
     @if(isScanning()) {
-        <div class="shield">
-            <img src="/assets/img/shield_on.svg" [class.shield-animate]="animateShield()" (animationend)="onShieldAnimationEnd()">
-            <p>Real-time Scan is ON</p>
-            <button (click)="toggleScanning()" class="btn1">Turn OFF</button>
-        </div>
+      <div class="shield">
+        <img src="/assets/img/shield_on.svg" [class.shield-animate]="animateShield()" (animationend)="onShieldAnimationEnd()">
+        <p>Real-time Scan is ON</p>
+        <button (click)="toggleScanning()" class="btn1">Turn OFF</button>
+      </div>
     }
 
     @else {
-        <div class="shield">
-            <img src="/assets/img/shield_off.svg" [class.shield-animate]="animateShield()" (animationend)="onShieldAnimationEnd()">
-            <p>Real-time Scan is OFF</p>
-            <button (click)="toggleScanning()" class="btn1">Turn ON</button>
-        </div>
+      <div class="shield">
+        <img src="/assets/img/shield_off.svg" [class.shield-animate]="animateShield()" (animationend)="onShieldAnimationEnd()">
+        <p>Real-time Scan is OFF</p>
+        <button (click)="toggleScanning()" class="btn1">Turn ON</button>
+      </div>
     }
+  </div>
 
+  <div class="home-grid">
+    <div class="grid-card">
+      <h3>Scanned</h3>
+      <p>{{totalScanned}}</p>
+    </div>
+    <div class="grid-card">
+      <h3>Flagged</h3>
+      <p>{{totalFlagged}}</p>
+    </div>
+    <div class="grid-card">
+      <h3>Safe</h3>
+      <p>{{totalSafe}}</p>
+    </div>
+    <div class="grid-card full-width detections-card">
+      <h3>Recent Detections</h3>
+      <div class="detections-list">
+        @for (item of recentDetections; track item.message + item.date + item.platform) {
+          <button type="button" class="detection-item" (click)="openDetection(item)">
+            <p class="detection-message">{{ previewMessage(item.message) }}</p>
+            <div class="detection-meta">
+              <span class="detection-date">{{ item.date }}</span>
+              <span class="platform-badge">{{ item.platform }}</span>
+            </div>
+          </button>
+        }
+      </div>
+    </div>
+  </div>
 </div>
 
-<div class="home-grid">
-    <div class="grid-card">
-        <h3>Scanned</h3>
-        <p >{{totalScanned}}</p>
+@if (selectedDetection(); as selected) {
+  <div class="detection-modal-backdrop" (click)="closeDetection()">
+    <div class="detection-modal" (click)="$event.stopPropagation()">
+      <h3>Detection Details</h3>
+      <p class="modal-message">{{ selected.message }}</p>
+      <div class="detection-meta">
+        <span class="detection-date">{{ selected.date }}</span>
+        <span class="platform-badge">{{ selected.platform }}</span>
+      </div>
+      <button type="button" class="modal-close-btn" (click)="closeDetection()">Close</button>
     </div>
-    <div class="grid-card">
-        <h3>Flagged</h3>
-        <p>{{totalFlagged}}</p>
-    </div>
-    <div class="grid-card">
-        <h3>Safe</h3>
-        <p>{{totalSafe}}</p>
-    </div>
-    <div class="grid-card full-width">
-        <h3>Recent Detections</h3>
-        <p class="recent">Detected content will be highlighted on web pages and stored in the extension history for review.</p>
-    </div>
-</div>
-
+  </div>
+}

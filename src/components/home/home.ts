@@ -2,6 +2,12 @@ import { Component, OnInit, signal } from '@angular/core';
 import { ContentScriptService } from '../../services/content-script.service';
 import { ExtensionService } from '../../services/extension.service';
 
+interface DetectionSample {
+  message: string;
+  date: string;
+  platform: string;
+}
+
 @Component({
   selector: 'app-home',
   imports: [],
@@ -9,8 +15,41 @@ import { ExtensionService } from '../../services/extension.service';
   styleUrl: './home.css',
 })
 export class Home implements OnInit {
-  isScanning = signal(true);
-  animateShield = signal(false);
+  isScanning = signal(false);
+  animateShield = signal(true);
+  selectedDetection = signal<DetectionSample | null>(null);
+  recentDetections: DetectionSample[] = [
+    {
+      message: 'Urgent: Your account is suspended. Verify now at bit.ly/secure-login.',
+      date: 'Apr 26, 2026',
+      platform: 'Facebook'
+    },
+    {
+      message: 'Congratulations! Claim your cash prize by paying a processing fee.',
+      date: 'Apr 26, 2026',
+      platform: 'SMS'
+    },
+    {
+      message: 'fake-delivery-support.com.',
+      date: 'Apr 25, 2026',
+      platform: 'URL'
+    },
+    {
+      message: 'Hi, this is support. Send your OTP so we can unlock your account.',
+      date: 'Apr 25, 2026',
+      platform: 'Instagram'
+    },
+    {
+      message: 'Investment alert: Guaranteed 20% daily returns. Limited slots only.',
+      date: 'Apr 24, 2026',
+      platform: 'Messenger'
+    },
+    {
+      message: 'Bank notice: Your card has been blocked, confirm identity immediately.',
+      date: 'Apr 24, 2026',
+      platform: 'Email'
+    }
+  ];
 
   constructor(
     private extensionService: ExtensionService,
@@ -35,6 +74,20 @@ export class Home implements OnInit {
 
   onShieldAnimationEnd() {
     this.animateShield.set(false);
+  }
+
+  openDetection(item: DetectionSample): void {
+    this.selectedDetection.set(item);
+  }
+
+  closeDetection(): void {
+    this.selectedDetection.set(null);
+  }
+
+  previewMessage(message: string): string {
+    const trimmed = message.trim();
+    if (trimmed.length <= 50) return trimmed;
+    return `${trimmed.slice(0, 50)}...`;
   }
 
   private playShieldAnimation() {

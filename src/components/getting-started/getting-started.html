@@ -1,23 +1,26 @@
-<div id="upper">
-    <img src="/assets/scamstop.svg" alt="scamstop logo" id="sclogo">
-    <button class="btn1" (click)="goToMain()">Get Started</button>
-    <div class="terms">
-        <p>By proceeding, you agree to our <u (click)="openTermsModal()">Terms and Conditions</u>
+<div class="container">
+    <div id="upper">
+        <img src="/assets/scamstop.svg" alt="scamstop logo" id="sclogo">
+        <button class="btn1" (click)="goToMain()">Get Started</button>
+        <div class="terms">
+            <p>By proceeding, you agree to our <u (click)="openTermsModal()">Terms and Conditions</u>
+        </div>
+    </div>
+    <div class="pnp_container">
+        <img src="/assets/Philippine_National_Police_seal.svg" id="pnpImage">
+        <p>In partnership with the Philippine National Police</p>
     </div>
 </div>
-<div class="pnp_container">
-    <img src="/assets/Philippine_National_Police_seal.svg" id="pnpImage">
-    <p>In partnership with the Philippine National Police</p>
-</div>
+    <app-universal-modal 
+        *ngIf="showModal" 
+        title="Terms and Conditions"
+        contentType="terms"
+        [showAcceptButton]="false"
+        (close)="closeModal()" 
+        (accept)="acceptTerms()">
+    </app-universal-modal>
 
-<app-universal-modal 
-    *ngIf="showModal" 
-    title="Terms and Conditions"
-    contentType="terms"
-    [showAcceptButton]="false"
-    (close)="closeModal()" 
-    (accept)="acceptTerms()">
-</app-universal-modal>
+
 
 
 <!-- Terms -->

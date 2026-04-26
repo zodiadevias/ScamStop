@@ -1,1 +1,51 @@
-<p>analytics works!</p>
+<div class="analytics-page">
+  <section class="analytics-hero">
+    <p class="eyebrow">ScamStop Analytics</p>
+    <h1>Reporting and Model Performance</h1>
+    <p>Track report activity and monitor NLP/LSH model performance in one view.</p>
+  </section>
+
+  <section class="chart-grid">
+    <article class="chart-card">
+      <h2>Your Total Reports per Day</h2>
+      <p class="chart-subtitle">Daily report count submitted by the current user.</p>
+      <div class="bar-list">
+        <div class="bar-row" *ngFor="let item of userDailyReports">
+          <div class="bar-label">{{ item.label }}</div>
+          <div class="bar-track">
+            <div class="bar-fill user-bar" [style.width.%]="userDailyWidth(item.value)"></div>
+          </div>
+          <div class="bar-value">{{ item.value }}</div>
+        </div>
+      </div>
+    </article>
+
+    <article class="chart-card">
+      <h2>Total Reports per Area</h2>
+      <p class="chart-subtitle">Area-based report counts (Location: Olongapo).</p>
+      <div class="bar-list">
+        <div class="bar-row" *ngFor="let item of areaReports">
+          <div class="bar-label area-label">{{ item.label }}</div>
+          <div class="bar-track">
+            <div class="bar-fill area-bar" [style.width.%]="areaReportWidth(item.value)"></div>
+          </div>
+          <div class="bar-value">{{ item.value }}</div>
+        </div>
+      </div>
+    </article>
+
+    <article class="chart-card">
+      <h2>NLP / LSH Model Performance (%)</h2>
+      <p class="chart-subtitle">Current model metrics as percentage values.</p>
+      <div class="bar-list">
+        <div class="bar-row" *ngFor="let metric of modelPerformance">
+          <div class="bar-label area-label">{{ metric.label }}</div>
+          <div class="bar-track">
+            <div class="bar-fill metric-bar" [style.width.%]="metric.percent"></div>
+          </div>
+          <div class="bar-value">{{ metric.percent }}%</div>
+        </div>
+      </div>
+    </article>
+  </section>
+</div>

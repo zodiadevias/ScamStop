@@ -1,0 +1,74 @@
+.settings-page {
+  padding: 20px 16px 90px;
+  color: #f3f4f6;
+  font-family: 'Quantico', sans-serif;
+}
+
+.settings-page h1 {
+  margin: 0 0 14px;
+  font-size: 24px;
+}
+
+.settings-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.setting-row h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.setting-row p {
+  margin: 0;
+  color: #d1d5db;
+  font-size: 13px;
+}
+
+.toggle-btn,
+.about-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toggle-btn {
+  background: #334155;
+  color: #f8fafc;
+  min-width: 62px;
+}
+
+.toggle-btn.active {
+  background: #22c55e;
+  color: #052e16;
+}
+
+.about-btn {
+  background: #38bdf8;
+  color: #082f49;
+}
+
+:host-context(.light-mode) .settings-page {
+  color: #0f172a;
+}
+
+:host-context(.light-mode) .settings-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+:host-context(.light-mode) .setting-row p {
+  color: #334155;
+}

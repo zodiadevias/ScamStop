@@ -3,7 +3,10 @@
   font-family: sans-serif;
   padding-right: 2%;
   padding-left: 2%;
-  
+}
+
+:host-context(.light-mode) .report-page {
+  background: #f8fafc;
 }
 
 .hero {
@@ -38,6 +41,13 @@
   gap: 1rem;
 }
 
+:host-context(.light-mode) .report-form {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 16px;
+  padding: 1rem;
+}
+
 .report-form label {
   font-weight: 700;
   color: #edf2ff;
@@ -54,6 +64,12 @@
   font-size: 1rem;
   
   outline: none;
+}
+
+:host-context(.light-mode) .report-form textarea {
+  border-color: rgba(15, 23, 42, 0.18);
+  background: #ffffff;
+  color: #000000;
 }
 
 .report-form textarea:focus {

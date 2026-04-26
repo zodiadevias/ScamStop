@@ -5,6 +5,7 @@ import { Home } from '../components/home/home';
 import { Report } from '../components/report/report';
 import { Analytics } from '../components/analytics/analytics';
 import { About } from '../components/about/about';
+import { Settings } from '../components/settings/settings';
 
 
 export const routes: Routes = [
@@ -17,7 +18,8 @@ export const routes: Routes = [
             { path: 'home', component: Home },
             { path: 'report', component: Report },
             { path: 'analytics', component: Analytics },
-            { path: 'about', component: About }
+            { path: 'about', component: About },
+            { path: 'settings', component: Settings }
         ]
     }
 ];

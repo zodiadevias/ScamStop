@@ -32,6 +32,14 @@
     }
 }
 
+
+
+.container {
+    min-height: 100vh;
+    min-height: 100dvh;
+    background: linear-gradient(180deg, #090d16 0%, #111827 100%);
+}
+
 #sclogo{
     width: 50%;
     height: 50%;
@@ -51,6 +59,12 @@
     transition: transform 0.3s ease;
 }
 
+:host-context(.light-mode) .btn1 {
+    background: #0ea5e9;
+    color: #082f49;
+    border: 1px solid #0284c7;
+}
+
 .btn1:hover {
     transform: scale(1.1);
 }
@@ -62,8 +76,16 @@
     text-align: center;
 }
 
+:host-context(.light-mode) .terms {
+    color: #0f172a;
+}
+
 u {
     color: green;
+}
+
+:host-context(.light-mode) u {
+    color: #0369a1;
 }
 
 .pnp {
@@ -90,4 +112,11 @@ u {
 
 }
 
+:host-context(.light-mode) .pnp_container {
+    color: #334155;
+}
+
+#upper{
+    background-color: none;
+}
 

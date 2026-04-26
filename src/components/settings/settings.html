@@ -1,0 +1,30 @@
+<div class="settings-page">
+  <h1>Settings</h1>
+
+  <section class="settings-card">
+    <div class="setting-row">
+      <div>
+        <h2>Light Mode</h2>
+        <p>Switch between dark and light appearance.</p>
+      </div>
+      <button
+        type="button"
+        class="toggle-btn"
+        [class.active]="themeService.lightModeEnabled()"
+        (click)="toggleLightMode()"
+      >
+        {{ themeService.lightModeEnabled() ? 'ON' : 'OFF' }}
+      </button>
+    </div>
+  </section>
+
+  <section class="settings-card">
+    <div class="setting-row">
+      <div>
+        <h2>About</h2>
+        <p>View ScamStop details, features, and legal info.</p>
+      </div>
+      <button type="button" class="about-btn" (click)="goToAbout()">Go</button>
+    </div>
+  </section>
+</div>
