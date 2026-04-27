@@ -1,4 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { ContentScriptService } from '../../services/content-script.service';
 import { ExtensionService } from '../../services/extension.service';
 
@@ -6,6 +7,7 @@ interface DetectionSample {
   message: string;
   date: string;
   platform: string;
+  risk: number;
 }
 
 @Component({
@@ -22,36 +24,43 @@ export class Home implements OnInit {
     {
       message: 'Urgent: Your account is suspended. Verify now at bit.ly/secure-login.',
       date: 'Apr 26, 2026',
-      platform: 'Facebook'
+      platform: 'Facebook',
+      risk: 91
     },
     {
       message: 'Congratulations! Claim your cash prize by paying a processing fee.',
       date: 'Apr 26, 2026',
-      platform: 'SMS'
+      platform: 'SMS',
+      risk: 86
     },
     {
       message: 'fake-delivery-support.com.',
       date: 'Apr 25, 2026',
-      platform: 'URL'
+      platform: 'URL',
+      risk: 78
     },
     {
       message: 'Hi, this is support. Send your OTP so we can unlock your account.',
       date: 'Apr 25, 2026',
-      platform: 'Instagram'
+      platform: 'Instagram',
+      risk: 88
     },
     {
       message: 'Investment alert: Guaranteed 20% daily returns. Limited slots only.',
       date: 'Apr 24, 2026',
-      platform: 'Messenger'
+      platform: 'Messenger',
+      risk: 93
     },
     {
       message: 'Bank notice: Your card has been blocked, confirm identity immediately.',
       date: 'Apr 24, 2026',
-      platform: 'Email'
+      platform: 'Email',
+      risk: 84
     }
   ];
 
   constructor(
+    private router: Router,
     private extensionService: ExtensionService,
     private contentScriptService: ContentScriptService
   ) {}
@@ -82,6 +91,12 @@ export class Home implements OnInit {
 
   closeDetection(): void {
     this.selectedDetection.set(null);
+  }
+
+  goToReportFromDetection(message: string): void {
+    const encodedMessage = encodeURIComponent(message);
+    this.closeDetection();
+    this.router.navigateByUrl(`/main/report?message=${encodedMessage}`);
   }
 
   previewMessage(message: string): string {

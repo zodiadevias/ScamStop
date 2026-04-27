@@ -180,8 +180,8 @@ h3{
 
 .detection-meta {
     margin-top: 8px;
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
     align-items: center;
     gap: 8px;
 }
@@ -189,6 +189,7 @@ h3{
 .detection-date {
     color: #9ca3af;
     font-size: 12px;
+    text-align: left;
 }
 
 .platform-badge {
@@ -198,6 +199,19 @@ h3{
     background: #4ade80;
     border-radius: 999px;
     padding: 2px 8px;
+    justify-self: end;
+}
+
+.risk-badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: #111827;
+    background: #fbbf24;
+    border-radius: 999px;
+    padding: 2px 8px;
+    justify-self: end;
+    min-width: 68px;
+    text-align: center;
 }
 
 .detection-modal-backdrop {
@@ -241,6 +255,27 @@ h3{
     font-weight: 700;
     padding: 8px 14px;
     cursor: pointer;
+}
+
+.modal-actions {
+    margin-top: 14px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.modal-report-btn {
+    border: none;
+    border-radius: 8px;
+    background: #38bdf8;
+    color: #082f49;
+    font-weight: 700;
+    padding: 8px 14px;
+    cursor: pointer;
+}
+
+.modal-close-btn {
+    margin-top: 0;
 }
 
 .grid-card h3 {

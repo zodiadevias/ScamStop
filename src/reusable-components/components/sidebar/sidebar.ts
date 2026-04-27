@@ -1,5 +1,6 @@
 import { Component, AfterViewInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ThemeService } from '../../../services/theme.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -15,6 +16,8 @@ export class Sidebar implements AfterViewInit, OnDestroy {
   private readonly hashChangeHandler = () => this.setActiveLink();
   private readonly viewportResizeHandler = () => this.handleViewportResize();
   private initialViewportHeight = 0;
+
+  constructor(public themeService: ThemeService) {}
 
   ngAfterViewInit() {
     this.setActiveLink();

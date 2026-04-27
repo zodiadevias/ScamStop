@@ -38,6 +38,7 @@
             <p class="detection-message">{{ previewMessage(item.message) }}</p>
             <div class="detection-meta">
               <span class="detection-date">{{ item.date }}</span>
+              <span class="risk-badge">Risk {{ item.risk }}%</span>
               <span class="platform-badge">{{ item.platform }}</span>
             </div>
           </button>
@@ -54,9 +55,15 @@
       <p class="modal-message">{{ selected.message }}</p>
       <div class="detection-meta">
         <span class="detection-date">{{ selected.date }}</span>
+        <span class="risk-badge">Risk {{ selected.risk }}%</span>
         <span class="platform-badge">{{ selected.platform }}</span>
       </div>
-      <button type="button" class="modal-close-btn" (click)="closeDetection()">Close</button>
+      <div class="modal-actions">
+        <button type="button" class="modal-report-btn" (click)="goToReportFromDetection(selected.message)">
+          Report
+        </button>
+        <button type="button" class="modal-close-btn" (click)="closeDetection()">Close</button>
+      </div>
     </div>
   </div>
 }

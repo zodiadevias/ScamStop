@@ -1,4 +1,5 @@
-import { Component, signal } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { ScamDetectionService } from '../../services/scam-detection.service';
 
@@ -9,13 +10,23 @@ import { ScamDetectionService } from '../../services/scam-detection.service';
   templateUrl: './report.html',
   styleUrl: './report.css',
 })
-export class Report {
+export class Report implements OnInit {
   reportText = signal('');
   submitting = signal(false);
   successMessage = signal('');
   errorMessage = signal('');
 
-  constructor(private scamDetection: ScamDetectionService) {}
+  constructor(
+    private scamDetection: ScamDetectionService,
+    private route: ActivatedRoute
+  ) {}
+
+  ngOnInit(): void {
+    const message = this.route.snapshot.queryParamMap.get('message');
+    if (message) {
+      this.reportText.set(message);
+    }
+  }
 
   submitReport() {
     const message = this.reportText().trim();

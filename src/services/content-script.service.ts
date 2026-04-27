@@ -217,7 +217,7 @@ export class ContentScriptService {
         position: relative; z-index: 9999 !important; padding: 2px 6px; border-radius: 4px;
         width: max-content; min-width: 60px; text-align: center;
         height: 15px;
-        font-family: sans-serif; font-size: 10px; font-weight: bold; color: white !important;
+        font-family: sans-serif; font-size: 10px; font-weight: bold; color: black !important;
         cursor: pointer; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
       }
       .scamstop-marker[data-risk="high"] { background: #ff3c5f !important; }
@@ -229,7 +229,7 @@ export class ContentScriptService {
       }
       .scamstop-modal {
         background: #1a1a1a; padding: 25px; border-radius: 12px; max-width: 450px; width: 90%; color: white;
-        border: 1px solid #444; font-family: sans-serif;
+        border: 1px solid #444; font-family: sans-serif; color: black;
       }
     `;
 
@@ -247,17 +247,29 @@ export class ContentScriptService {
   }
 
   private showFullContentModal(text: string, risk: number): void {
+    const reportUrl = this.chrome?.runtime?.getURL(
+      `index.html#/main/report?message=${encodeURIComponent(text)}`
+    );
     const root = document.createElement('div');
     root.className = 'scamstop-modal-overlay';
     root.innerHTML = `
       <div class="scamstop-modal">
-        <h3>ScamStop Analysis</h3>
+        <h3 style="color: white;">ScamStop Analysis</h3>
         <p><strong>Risk Score:</strong> ${risk}%</p>
         <div style="background:#222; padding:10px; border-radius:5px; margin:10px 0; font-size:13px; color:#ccc;">${text}</div>
-        <button id="ss-close" style="width:100%; padding:10px; cursor:pointer;">Close</button>
+        <div style="display:flex; gap:8px;">
+          <button id="ss-report" style="flex:1; padding:10px; cursor:pointer; background:#4caf50; color:white; border:none; border-radius:6px;">Report</button>
+          <button id="ss-close" style="flex:1; padding:10px; cursor:pointer;">Close</button>
+        </div>
       </div>
     `;
     document.body.appendChild(root);
+    document.getElementById('ss-report')?.addEventListener('click', () => {
+      if (reportUrl) {
+        window.open(reportUrl, '_blank');
+      }
+      root.remove();
+    });
     document.getElementById('ss-close')?.addEventListener('click', () => root.remove());
   }
 

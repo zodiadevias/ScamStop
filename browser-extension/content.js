@@ -176,7 +176,7 @@ function injectStyles(pKey) {
       position: relative; z-index: 9999 !important; padding: 2px 6px; border-radius: 4px;
       width: max-content; min-width: 60px; text-align: center;
       height: 15px;
-      font-family: sans-serif; font-size: 10px; font-weight: bold; color: white !important;
+      font-family: sans-serif; font-size: 10px; font-weight: bold; color: black !important;
       cursor: pointer; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
     }
     .scamstop-marker[data-risk="high"] { background: #ff3c5f !important; }
@@ -188,7 +188,7 @@ function injectStyles(pKey) {
     }
     .scamstop-modal {
       background: #1a1a1a; padding: 25px; border-radius: 12px; max-width: 450px; width: 90%; color: white;
-      border: 1px solid #444; font-family: sans-serif;
+      border: 1px solid #444; font-family: sans-serif; color: white;
     }
   `;
 

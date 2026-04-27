@@ -26,7 +26,7 @@
   margin: 0;
   font-size: clamp(2rem, 2.3vw, 2.6rem);
   color: #edf2ff;
-  font-family: Quantico, sans-serif;
+  font-family: sans-serif;
   line-height: 1.05;
 }
 

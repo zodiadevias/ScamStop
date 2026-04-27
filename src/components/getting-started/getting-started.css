@@ -37,7 +37,7 @@
 .container {
     min-height: 100vh;
     min-height: 100dvh;
-    background: linear-gradient(180deg, #090d16 0%, #111827 100%);
+    
 }
 
 #sclogo{

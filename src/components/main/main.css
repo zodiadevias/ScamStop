@@ -4,17 +4,20 @@
     min-height: 100vh;
     min-height: 100dvh;
     background: linear-gradient(180deg, #090d16 0%, #111827 100%);
+    position: relative;
+    z-index: 100;
 }
 
 :host-context(.light-mode) .main-container {
-    background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+    background: white;
 }
 
 .content {
     flex: 1;
     min-height: calc(100vh - 70px);
     min-height: calc(100dvh - 70px);
-    
+    padding-bottom: 70px;
+    box-sizing: border-box;
 }
 
 .fade-wrapper {

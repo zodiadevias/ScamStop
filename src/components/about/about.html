@@ -1,1 +1,74 @@
-<button (click)="resetOnboarding()">reset</button>
+<div class="about-container">
+  <header class="about-header">
+    <h1>About ScamStop</h1>
+    <p class="subtitle">
+      A community-first scam detection platform built to help users detect, report, and stay safe.
+    </p>
+  </header>
+
+  <section class="mission-section">
+    <h2>Mission</h2>
+    <p>
+      ScamStop helps users identify suspicious content across social platforms, SMS, and links. It combines
+      NLP and LSH-based detection with community reporting so threat intelligence grows in real time.
+    </p>
+  </section>
+
+  <section class="features-section">
+    <h2>What ScamStop Provides</h2>
+    <div class="features-grid">
+      @for (feature of features; track feature.title) {
+        <article class="feature-card">
+          <div class="feature-icon">{{ feature.icon }}</div>
+          <h3>{{ feature.title }}</h3>
+          <p>{{ feature.description }}</p>
+        </article>
+      }
+    </div>
+  </section>
+
+  <section class="partners-section">
+    <h2>Partnerships and Team</h2>
+    <div class="partners-grid">
+      @for (partner of partners; track partner.name) {
+        <article class="partner-card">
+          <div class="partner-icon">{{ partner.icon }}</div>
+          <h3>{{ partner.name }}</h3>
+          <p>{{ partner.description }}</p>
+        </article>
+      }
+      <article class="partner-card">
+        <div class="partner-icon">🐋</div>
+        <h3>Team Ambergris</h3>
+        <p>Core development and research team behind ScamStop.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="legal-section">
+    <button class="legal-btn" (click)="openTermsModal()">
+      <span>Terms and Conditions</span>
+      <span class="toggle-icon">Open</span>
+    </button>
+    <button class="legal-btn reset-btn" (click)="resetOnboarding()">Reset Onboarding</button>
+  </section>
+
+  <section class="version-section">
+    <div class="version-info">
+      <span class="version-label">Version</span>
+      <span class="version-number">{{ appVersion }}</span>
+    </div>
+    <div class="version-info">
+      <span class="version-label">Coverage</span>
+      <span class="version-number">Olongapo City</span>
+    </div>
+  </section>
+</div>
+
+<app-universal-modal
+  *ngIf="showTerms()"
+  title="Terms and Conditions"
+  contentType="terms"
+  [showAcceptButton]="false"
+  (close)="closeTermsModal()"
+></app-universal-modal>

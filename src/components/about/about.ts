@@ -1,18 +1,19 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
+import { UniversalModal } from '../../reusable-components/modals/universal-modal/universal-modal';
 
 @Component({
   selector: 'app-about',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, UniversalModal],
   templateUrl: './about.html',
   styleUrl: './about.css',
 })
 export class About {
   private readonly onboardingSeenKey = 'scamstop_onboarding_seen';
   showTerms = signal(false);
-  showPrivacy = signal(false);
+  appVersion = 'v1.0.0';
 
   features = [
     {
@@ -39,27 +40,21 @@ export class About {
       icon: '🔌',
       title: 'Browser Extension',
       description: 'Protect yourself while browsing WhatsApp, Messenger, Facebook, and more'
-    },
-    {
-      icon: '🏛️',
-      title: 'PNP Partnership',
-      description: 'Official partnership with Philippine National Police Cybercrime Unit'
     }
   ];
 
   partners = [
-    { name: 'Philippine National Police', icon: '🏛️', description: 'Cybercrime Unit' },
-    { name: 'Olongapo City', icon: '🏙️', description: 'Local Government' }
+    { name: 'Philippine National Police', icon: '🏛️', description: 'Police Station 3, Olongapo City' }
   ];
 
   constructor(private router: Router) {}
 
-  toggleTerms() {
-    this.showTerms.set(!this.showTerms());
+  openTermsModal() {
+    this.showTerms.set(true);
   }
 
-  togglePrivacy() {
-    this.showPrivacy.set(!this.showPrivacy());
+  closeTermsModal() {
+    this.showTerms.set(false);
   }
 
   resetOnboarding() {

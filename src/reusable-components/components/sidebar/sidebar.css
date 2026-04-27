@@ -12,6 +12,12 @@
     --keyboard-overlap: 0px;
 }
 
+:host-context(.light-mode) .sidebar {
+    background-color: #ffffff;
+    border-top-color: rgba(15, 23, 42, 0.12);
+    box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.08);
+}
+
 .nav-menu {
     list-style: none;
     padding: 0;
@@ -40,6 +46,10 @@
     width: 100%;
 }
 
+:host-context(.light-mode) .nav-item {
+    color: #334155;
+}
+
 /* .nav-item:hover {
     background-color: #2a2a4e;
     color: #fff;
@@ -48,6 +58,10 @@
 .nav-item.active {
     background-color: #4caf50;
     color: #fff;
+}
+
+:host-context(.light-mode) .nav-item.active {
+    color: #052e16;
 }
 
 .nav-icon {
@@ -65,6 +79,10 @@
 
 .burger-btn:hover {
     color: #4caf50;
+}
+
+:host-context(.light-mode) .burger-btn:hover {
+    color: #16a34a;
 }
 
 .sidebar-logo {
