@@ -129,11 +129,14 @@ async function scoreAndMark(element) {
   const text = extractText(element);
   if (!text || text.length < 10) return;
 
-  const response = await sendMessage({ type: 'score-text', payload: { text: text, url: window.location.hostname } });
+  // Pass the current page URL so the background can record it
+  const response = await sendMessage({
+    type: 'score-text',
+    payload: { text, url: location.hostname }
+  });
+
   if (response?.ok && response.result) {
-    const prob = response.result.scamProbability;
-    upsertBadge(element, prob);
-    saveToHistory({ text, risk: prob, platform, timestamp: new Date().toISOString() });
+    upsertBadge(element, response.result.scamProbability);
   }
 }
 
@@ -145,10 +148,10 @@ function upsertBadge(element, probability) {
   const rounded = Math.round(probability);
   badge.textContent = `RISK: ${rounded}%`;
   badge.setAttribute('data-risk', getRiskLevel(rounded));
-  badge.onclick = (e) => {
+  badge.addEventListener('click', (e) => {
     e.stopPropagation();
     showFullContentModal(extractText(element), rounded);
-  };
+  });
   element.appendChild(badge);
 }
 
@@ -206,31 +209,42 @@ function injectStyles(pKey) {
 function showFullContentModal(text, risk) {
   const root = document.createElement('div');
   root.className = 'scamstop-modal-overlay';
-  root.innerHTML = `
-    <div class="scamstop-modal">
-      <h3>ScamStop Analysis</h3>
-      <p><strong>Risk Score:</strong> ${risk}%</p>
-      <div style="background:#222; padding:10px; border-radius:5px; margin:10px 0; font-size:13px; color:#ccc;">${text}</div>
-      <button id="ss-close" style="width:100%; padding:10px; cursor:pointer;">Close</button>
-    </div>
-  `;
+
+  const modal = document.createElement('div');
+  modal.className = 'scamstop-modal';
+
+  const title = document.createElement('h3');
+  title.textContent = 'ScamStop Analysis';
+
+  const riskPara = document.createElement('p');
+  const riskLabel = document.createElement('strong');
+  riskLabel.textContent = 'Risk Score: ';
+  riskPara.appendChild(riskLabel);
+  riskPara.appendChild(document.createTextNode(`${risk}%`));
+
+  const textBox = document.createElement('div');
+  textBox.style.cssText = 'background:#222;padding:10px;border-radius:5px;margin:10px 0;font-size:13px;color:#ccc;word-break:break-word;';
+  textBox.textContent = text; // textContent — never innerHTML, prevents XSS
+
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = 'Close';
+  closeBtn.style.cssText = 'width:100%;padding:10px;cursor:pointer;';
+  closeBtn.addEventListener('click', () => root.remove());
+
+  modal.appendChild(title);
+  modal.appendChild(riskPara);
+  modal.appendChild(textBox);
+  modal.appendChild(closeBtn);
+  root.appendChild(modal);
+
+  // Close on backdrop click
+  root.addEventListener('click', (e) => {
+    if (e.target === root) root.remove();
+  });
+
   document.body.appendChild(root);
-  document.getElementById('ss-close').onclick = () => root.remove();
 }
 
 function getRiskLevel(p) { return p >= 70 ? 'high' : (p >= 40 ? 'medium' : 'low'); }
 function isElementVisible(el) { const r = el.getBoundingClientRect(); return r.top < window.innerHeight && r.bottom > 0; }
 function sendMessage(msg) { return new Promise(res => chrome.runtime.sendMessage(msg, r => res(r))); }
-async function saveToHistory(item) {
-  const data = await chrome.storage.local.get({ recentDetections: [] });
-  const formattedItem = {
-    text: item.text,
-    risk: item.risk,
-    url: item.platform === 'ig' ? 'instagram.com' : item.platform,
-    ts: new Date().toISOString()
-  };
-
-  const updated = [formattedItem, ...data.recentDetections].slice(0, 20);
-  await chrome.storage.local.set({ recentDetections: updated });
-  console.log('ScamStop: Detection saved to storage', formattedItem);
-}

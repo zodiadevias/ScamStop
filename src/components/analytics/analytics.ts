@@ -1,46 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input } from '@angular/core';
-
-interface BarDatum {
-  label: string;
-  value: number;
-}
+import { Component, OnInit, inject, signal } from '@angular/core';
+import { ScamDetectionService, PerformanceData, BarDatum } from '../../services/scam-detection.service';
+import { FirestoreService } from '../../services/firestore.service';
+import { AnalyticsData } from '../../services/scam-detection.service';
 
 interface MetricDatum {
   label: string;
   percent: number;
 }
-
-export interface AnalyticsPayload {
-  userDailyReports?: BarDatum[];
-  areaReports?: BarDatum[];
-  modelPerformance?: MetricDatum[];
-}
-
-const DEFAULT_ANALYTICS_DATA: AnalyticsPayload = {
-  userDailyReports: [
-    { label: 'Mon', value: 3 },
-    { label: 'Tue', value: 5 },
-    { label: 'Wed', value: 2 },
-    { label: 'Thu', value: 6 },
-    { label: 'Fri', value: 4 },
-    { label: 'Sat', value: 7 },
-    { label: 'Sun', value: 3 }
-  ],
-  areaReports: [
-    { label: 'Olongapo', value: 18 },
-    { label: 'Subic', value: 11 },
-    { label: 'Castillejos', value: 8 },
-    { label: 'Dinalupihan', value: 6 },
-    { label: 'San Marcelino', value: 4 }
-  ],
-  modelPerformance: [
-    { label: 'Precision', percent: 92 },
-    { label: 'Recall', percent: 88 },
-    { label: 'F1-Score', percent: 90 },
-    { label: 'LSH Match Quality', percent: 85 }
-  ]
-};
 
 @Component({
   selector: 'app-analytics',
@@ -48,73 +15,86 @@ const DEFAULT_ANALYTICS_DATA: AnalyticsPayload = {
   templateUrl: './analytics.html',
   styleUrl: './analytics.css',
 })
-export class Analytics {
-  userDailyReports: BarDatum[] = [];
-  areaReports: BarDatum[] = [];
-  modelPerformance: MetricDatum[] = [];
-  private maxUserDailyReports = 1;
-  private maxAreaReports = 1;
+export class Analytics implements OnInit {
+  private svc       = inject(ScamDetectionService);
+  private firestore = inject(FirestoreService);
 
-  @Input() set analyticsData(payload: AnalyticsPayload | null | undefined) {
-    this.applyPayload(payload, true);
+  // ── Report analytics (from Firestore via API) ──────────────────────────
+  reportsByDay  = signal<BarDatum[]>([]);
+  reportsByCity = signal<BarDatum[]>([]);
+  reportsByType = signal<BarDatum[]>([]);
+  totals        = signal<{ total: number; pending: number; verified: number; rejected: number } | null>(null);
+  analyticsLoading = signal(true);
+  analyticsError   = signal<string | null>(null);
+
+  // ── Model performance (untouched) ──────────────────────────────────────
+  modelPerformance = signal<MetricDatum[]>([]);
+  metricsLoading   = signal(false);
+  metricsError     = signal<string | null>(null);
+
+  ngOnInit(): void {
+    this.loadAnalytics();
+    this.loadMetrics();
   }
 
-  constructor() {
-    this.applyPayload(DEFAULT_ANALYTICS_DATA, false);
+  // ── Analytics ──────────────────────────────────────────────────────────
+
+  loadAnalytics(): void {
+    this.analyticsLoading.set(true);
+    this.analyticsError.set(null);
+
+    this.firestore.getAnalytics().subscribe({
+      next: (data: AnalyticsData) => {
+        this.reportsByDay.set(data.reports_by_day   ?? []);
+        this.reportsByCity.set(data.reports_by_city ?? []);
+        this.reportsByType.set(data.reports_by_type ?? []);
+        this.totals.set(data.totals ?? null);
+        this.analyticsLoading.set(false);
+      },
+      error: (err: Error) => {
+        this.analyticsError.set(err?.message ?? 'Could not load analytics.');
+        this.analyticsLoading.set(false);
+      }
+    });
   }
 
-  userDailyWidth(value: number): number {
-    return (value / this.maxUserDailyReports) * 100;
+  maxValue(items: BarDatum[]): number {
+    return Math.max(...items.map(i => i.value), 1);
   }
 
-  areaReportWidth(value: number): number {
-    return (value / this.maxAreaReports) * 100;
+  barWidth(value: number, items: BarDatum[]): number {
+    return (value / this.maxValue(items)) * 100;
   }
 
-  private applyPayload(
-    payload: AnalyticsPayload | null | undefined,
-    useFallbackForMissingData: boolean
-  ): void {
-    const fallback = useFallbackForMissingData ? DEFAULT_ANALYTICS_DATA : undefined;
+  // ── Model metrics (untouched) ──────────────────────────────────────────
 
-    this.userDailyReports = this.normalizeBars(payload?.userDailyReports, fallback?.userDailyReports);
-    this.areaReports = this.normalizeBars(payload?.areaReports, fallback?.areaReports);
-    this.modelPerformance = this.normalizeMetrics(
-      payload?.modelPerformance,
-      fallback?.modelPerformance
-    );
+  loadMetrics(): void {
+    this.metricsLoading.set(true);
+    this.metricsError.set(null);
 
-    this.maxUserDailyReports = Math.max(...this.userDailyReports.map((item) => item.value), 1);
-    this.maxAreaReports = Math.max(...this.areaReports.map((item) => item.value), 1);
+    this.svc.fetchMetrics().subscribe({
+      next: (data: PerformanceData) => {
+        this.modelPerformance.set(this.mapPerformanceData(data));
+        this.metricsLoading.set(false);
+      },
+      error: (err: Error) => {
+        this.metricsError.set(err?.message ?? 'Could not load model metrics.');
+        this.metricsLoading.set(false);
+      }
+    });
   }
 
-  private normalizeBars(source: BarDatum[] | undefined, fallback?: BarDatum[]): BarDatum[] {
-    const effectiveSource = Array.isArray(source) && source.length > 0 ? source : (fallback ?? []);
-
-    if (!Array.isArray(effectiveSource)) return [];
-    return effectiveSource
-      .filter((item) => item && typeof item.label === 'string')
-      .map((item) => ({
-        label: item.label.trim(),
-        value: this.toNonNegativeNumber(item.value)
-      }));
-  }
-
-  private normalizeMetrics(source: MetricDatum[] | undefined, fallback?: MetricDatum[]): MetricDatum[] {
-    const effectiveSource = Array.isArray(source) && source.length > 0 ? source : (fallback ?? []);
-
-    if (!Array.isArray(effectiveSource)) return [];
-    return effectiveSource
-      .filter((item) => item && typeof item.label === 'string')
-      .map((item) => ({
-        label: item.label.trim(),
-        percent: Math.min(100, this.toNonNegativeNumber(item.percent))
-      }));
-  }
-
-  private toNonNegativeNumber(value: unknown): number {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) return 0;
-    return Math.max(0, numeric);
+  private mapPerformanceData(data: PerformanceData): MetricDatum[] {
+    const m = data?.performance_metrics;
+    if (!m) return [];
+    const toPercent = (val: number | null) =>
+      val == null ? 0 : Math.round(val > 1 ? val : val * 100);
+    return [
+      { label: 'Accuracy',  percent: toPercent(m.accuracy) },
+      { label: 'Precision', percent: toPercent(m.precision) },
+      { label: 'Recall',    percent: toPercent(m.recall) },
+      { label: 'F1-Score',  percent: toPercent(m.f1_score) },
+      { label: 'AUC-ROC',   percent: toPercent(m.auc_roc) },
+    ];
   }
 }

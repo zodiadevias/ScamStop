@@ -1,43 +1,156 @@
 @import url('https://fonts.googleapis.com/css2?family=Quantico:ital,wght@0,400;0,700;1,400;1,700&display=swap');
 
-body{
-    background: #111827;
-    margin: 0;
-    
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+body {
+  background: #111827;
+  margin: 0;
 }
 
-body.light-mode {
-    background: #f8fafc;
-}
-
-body.light-mode * {
-    color: #000 !important;
-}
-
-body.light-mode input::placeholder,
-body.light-mode textarea::placeholder {
-    color: #000 !important;
-    opacity: 0.75;
-}
-.btn1{
-    font-family: "Quantico", sans-serif;
-    background-color: white;
-    color: #1E3A62;
-    border: 1px solid #1E3A62;
-    border-radius: 5px;
-    padding: 10px 20px;
-    cursor: pointer;
-}
-
-u{
-    cursor: pointer;
-}
-
-/* for chrome extension */
 html, body {
-    width: 400px;
-    height: 600px;
-    
-    margin: 0;
-    padding: 0;
+  width: 400px;
+  height: 600px;
+  margin: 0;
+  padding: 0;
+}
+
+u { cursor: pointer; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LIGHT MODE
+   Selector: app-root.light-mode — this element is always a direct ancestor
+   of every component, so :host-context() works and these global rules have
+   enough specificity to override component-scoped dark colors.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Also keep body/html for non-extension web context */
+body.light-mode,
+html.light-mode,
+app-root.light-mode {
+  background: #f8fafc;
+}
+
+/* Page wrappers */
+app-root.light-mode .home-layout,
+app-root.light-mode .report-page,
+app-root.light-mode .analytics-page,
+app-root.light-mode .settings-page {
+  background: #f8fafc !important;
+}
+
+/* All headings and paragraphs */
+app-root.light-mode h1,
+app-root.light-mode h2,
+app-root.light-mode h3,
+app-root.light-mode h4,
+app-root.light-mode p {
+  color: #0f172a !important;
+}
+
+/* Labels */
+app-root.light-mode label {
+  color: #374151 !important;
+}
+
+/* Bar chart labels and values */
+app-root.light-mode .bar-label,
+app-root.light-mode .bar-value,
+app-root.light-mode .detection-message,
+app-root.light-mode .detection-date,
+app-root.light-mode .file-name,
+app-root.light-mode .lookup-status-text,
+app-root.light-mode .status-label,
+app-root.light-mode .metrics-state {
+  color: #0f172a !important;
+}
+
+/* Accent / eyebrow labels */
+app-root.light-mode .eyebrow {
+  color: #0369a1 !important;
+}
+
+app-root.light-mode .section-label {
+  color: #0369a1 !important;
+}
+
+/* Muted text */
+app-root.light-mode .hero p,
+app-root.light-mode .analytics-hero p,
+app-root.light-mode .lookup-subtitle,
+app-root.light-mode .chart-subtitle,
+app-root.light-mode .hint,
+app-root.light-mode .field-hint,
+app-root.light-mode .setting-row p {
+  color: #475569 !important;
+}
+
+/* Inputs */
+app-root.light-mode input,
+app-root.light-mode select,
+app-root.light-mode textarea {
+  background: #f8fafc !important;
+  border-color: rgba(15, 23, 42, 0.18) !important;
+  color: #0f172a !important;
+}
+
+app-root.light-mode input::placeholder,
+app-root.light-mode textarea::placeholder {
+  color: #6b7280 !important;
+  opacity: 1 !important;
+}
+
+app-root.light-mode select option {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Cards & panels */
+app-root.light-mode .grid-card,
+app-root.light-mode .chart-card,
+app-root.light-mode .settings-card,
+app-root.light-mode .lookup-card,
+app-root.light-mode .detection-modal,
+app-root.light-mode .report-form {
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+/* Detection items */
+app-root.light-mode .detection-item {
+  background: #f8fafc !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+app-root.light-mode .detection-item:hover {
+  background: #eef2ff !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+}
+
+/* Bar tracks */
+app-root.light-mode .bar-track {
+  background: rgba(148, 163, 184, 0.45) !important;
+}
+
+/* Modal */
+app-root.light-mode .modal-message {
+  color: #374151 !important;
+  background: #f1f5f9 !important;
+}
+
+app-root.light-mode .modal-close-btn,
+app-root.light-mode .modal-x {
+  color: #374151 !important;
+  border-color: rgba(15, 23, 42, 0.14) !important;
+}
+
+/* Lookup input */
+app-root.light-mode .lookup-input {
+  background: #f8fafc !important;
+  border-color: rgba(15, 23, 42, 0.18) !important;
+  color: #0f172a !important;
+}
+
+/* File drop */
+app-root.light-mode .file-drop {
+  border-color: rgba(15, 23, 42, 0.2) !important;
+  color: #6b7280 !important;
 }

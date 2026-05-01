@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, HostBinding, effect, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ThemeService } from '../services/theme.service';
 
@@ -11,7 +11,16 @@ import { ThemeService } from '../services/theme.service';
 export class App {
   protected readonly title = signal('ScamStop');
 
-  constructor(private themeService: ThemeService) {
+  @HostBinding('class.light-mode')
+  isLightMode = false;
+
+  constructor(public themeService: ThemeService) {
     this.themeService.initializeTheme();
+
+    // effect() reacts to signal changes and updates the HostBinding property,
+    // which triggers Angular CD to re-evaluate the class binding.
+    effect(() => {
+      this.isLightMode = this.themeService.lightModeEnabled();
+    });
   }
 }

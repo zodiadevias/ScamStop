@@ -7,19 +7,18 @@ import { Analytics } from '../components/analytics/analytics';
 import { About } from '../components/about/about';
 import { Settings } from '../components/settings/settings';
 
-
 export const routes: Routes = [
-    { path: '', component: GettingStarted },
-    { 
-        path: 'main', 
-        component: Main,
-        children: [
-            { path: '', redirectTo: 'home', pathMatch: 'full' },
-            { path: 'home', component: Home },
-            { path: 'report', component: Report },
-            { path: 'analytics', component: Analytics },
-            { path: 'about', component: About },
-            { path: 'settings', component: Settings }
-        ]
-    }
+  { path: '', component: GettingStarted },
+  {
+    path: 'main',
+    component: Main,
+    children: [
+      { path: '', redirectTo: 'home', pathMatch: 'full' },
+      { path: 'home', component: Home },
+      { path: 'report', component: Report },
+      { path: 'analytics', component: Analytics },
+      { path: 'about', component: About },
+      { path: 'settings', component: Settings }
+    ]
+  }
 ];

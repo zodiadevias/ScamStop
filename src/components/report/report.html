@@ -2,30 +2,206 @@
   <section class="hero">
     <p class="eyebrow">Report Scam</p>
     <h1>Submit a scam report</h1>
-    <p>Tell us about the suspicious message, website, or activity so ScamStop can learn and protect more users.</p>
+    <p>Help ScamStop protect more users by reporting suspicious messages, websites, or activities.</p>
   </section>
 
-  <form class="report-form" (submit)="submitReport(); $event.preventDefault();">
-    <label for="report-text">Describe the scam</label>
-    <textarea
-      id="report-text"
-      placeholder="Paste the suspicious message, URL, or scam details here"
-      [value]="reportText()"
-      (input)="reportText.set($any($event.target).value)"
-      rows="10"
-      autocomplete="off"
-    ></textarea>
+  <!-- ── Status Lookup ─────────────────────────────────────────────────── -->
+  <section class="lookup-card">
+    <h2 class="lookup-title">Check Report Status</h2>
+    <p class="lookup-subtitle">Enter your report ID to see its current status.</p>
+    <div class="lookup-row">
+      <input
+        type="text"
+        class="lookup-input"
+        placeholder="e.g. aB3xK9mNpQ2rT7uV"
+        [ngModel]="lookupId()"
+        (ngModelChange)="lookupId.set($event)"
+        name="lookupId"
+        (keydown.enter)="checkStatus()"
+        autocomplete="off"
+      />
+      <button type="button" class="lookup-btn" (click)="checkStatus()"
+              [disabled]="lookupLoading() || !lookupId().trim()">
+        @if (lookupLoading()) { <span class="spinner spinner-sm"></span> } @else { Check }
+      </button>
+    </div>
+    @if (lookupError()) {
+      <p class="lookup-error">{{ lookupError() }}</p>
+    }
+    @if (lookupResult()) {
+      <div class="lookup-result status-{{ lookupResult()!.status }}">
+        <div class="lookup-result-header">
+          <span class="status-dot"></span>
+          <span class="lookup-status-text">
+            @if (lookupResult()!.status === 'pending')  { Under Review }
+            @if (lookupResult()!.status === 'verified') { Verified }
+            @if (lookupResult()!.status === 'rejected') { Rejected }
+          </span>
+        </div>
+        <dl class="lookup-details">
+          <dt>Report ID</dt><dd class="mono">{{ lookupResult()!.report_id }}</dd>
+          @if (lookupResult()!.victim_name) {
+            <dt>Victim</dt><dd>{{ lookupResult()!.victim_name }}</dd>
+          }
+          @if (lookupResult()!.scam_type) {
+            <dt>Type</dt><dd>{{ lookupResult()!.scam_type }}</dd>
+          }
+          @if (lookupResult()!.reported_at) {
+            <dt>Submitted</dt><dd>{{ lookupResult()!.reported_at | date:'medium' }}</dd>
+          }
+        </dl>
+      </div>
+    }
+  </section>
+
+  <!-- ── Submit Form ───────────────────────────────────────────────────── -->
+  <form class="report-form" (ngSubmit)="submitReport()">
+
+    <!-- Section: Victim -->
+    <p class="section-label">Victim Information</p>
+
+    <div class="field">
+      <label for="victim-name">Victim's Name <span class="required">*</span></label>
+      <input id="victim-name" type="text" placeholder="Full name of the victim"
+             [ngModel]="victimName()" (ngModelChange)="victimName.set($event)"
+             name="victimName" autocomplete="off" />
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="scam-type">Type of Scam <span class="required">*</span></label>
+        <select id="scam-type" [ngModel]="scamType()" (ngModelChange)="scamType.set($event)" name="scamType">
+          <option value="" disabled>Select scam type…</option>
+          @for (type of scamTypes; track type) {
+            <option [value]="type">{{ type }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="city">City / Location <span class="optional">(auto-detected)</span></label>
+        <div class="location-wrap">
+          <input
+            id="city"
+            type="text"
+            list="ph-cities-list"
+            placeholder="Select or type a city…"
+            [ngModel]="city()"
+            (ngModelChange)="onCityChange($event)"
+            name="city"
+            autocomplete="off"
+          />
+          <datalist id="ph-cities-list">
+            @for (c of phCities; track c) {
+              <option [value]="c"></option>
+            }
+          </datalist>
+          @if (locationLoading()) {
+            <span class="location-spinner"></span>
+          }
+        </div>
+        @if (locationError()) {
+          <p class="field-hint">{{ locationError() }}</p>
+        }
+      </div>
+    </div>
+
+    <!-- Section: Suspect -->
+    <p class="section-label">Suspect Information <span class="optional">(optional)</span></p>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="suspect-name">Suspect Name / Alias</label>
+        <input id="suspect-name" type="text" placeholder="Name or alias used"
+               [ngModel]="suspectName()" (ngModelChange)="suspectName.set($event)"
+               name="suspectName" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="suspect-contact">Suspect Contact</label>
+        <input id="suspect-contact" type="text" placeholder="Phone, email, or social media"
+               [ngModel]="suspectContact()" (ngModelChange)="suspectContact.set($event)"
+               name="suspectContact" autocomplete="off" />
+      </div>
+    </div>
+
+    <div class="field field-half">
+      <label for="amount-lost">Amount Lost (PHP)</label>
+      <input id="amount-lost" type="number" min="0" placeholder="0.00"
+             [ngModel]="amountLost()" (ngModelChange)="amountLost.set($event)"
+             name="amountLost" autocomplete="off" />
+    </div>
+
+    <!-- Section: Incident -->
+    <p class="section-label">Incident Details</p>
+
+    <div class="field">
+      <label for="report-text">Describe the scam <span class="required">*</span></label>
+      <textarea id="report-text"
+                placeholder="Paste the suspicious message, URL, or describe what happened"
+                [ngModel]="reportText()" (ngModelChange)="reportText.set($event)"
+                name="reportText" rows="6" autocomplete="off"></textarea>
+    </div>
+
+    <div class="field">
+      <label for="url-input">Suspicious URL <span class="optional">(optional)</span></label>
+      <input id="url-input" type="url" placeholder="https://suspicious-site.com"
+             [ngModel]="urlInput()" (ngModelChange)="urlInput.set($event)"
+             name="urlInput" autocomplete="off" />
+    </div>
+
+    <div class="field">
+      <label>Screenshot / Evidence <span class="optional">(optional)</span></label>
+      @if (!selectedFile()) {
+        <label class="file-drop" for="file-input">
+          <span class="file-drop-icon">📎</span>
+          <span>Click to attach a screenshot or file</span>
+          <input id="file-input" type="file" accept="image/*,.pdf"
+                 (change)="onFileSelected($event)" hidden />
+        </label>
+      } @else {
+        <div class="file-preview">
+          <span class="file-name">{{ selectedFile()!.name }}</span>
+          <button type="button" class="remove-file" (click)="removeFile()" aria-label="Remove file">✕</button>
+        </div>
+      }
+      @if (uploadError()) {
+        <p class="field-error">{{ uploadError() }}</p>
+      }
+    </div>
+
+    <!-- Notices -->
+    @if (successMessage()) {
+      <p class="notice success">{{ successMessage() }}</p>
+    }
+    @if (reportStatus()) {
+      <div class="status-badge status-{{ reportStatus() }}">
+        <span class="status-dot"></span>
+        <span class="status-label">
+          Status:
+          @if (reportStatus() === 'pending')  { Under Review }
+          @if (reportStatus() === 'verified') { Verified }
+          @if (reportStatus() === 'rejected') { Rejected }
+        </span>
+        @if (reportId()) {
+          <span class="report-id">ID: {{ reportId() }}</span>
+        }
+      </div>
+    }
+    @if (errorMessage()) {
+      <p class="notice error">{{ errorMessage() }}</p>
+    }
 
     <div class="actions">
-      <button type="submit" [disabled]="submitting() || !reportText().trim()">
-        {{ submitting() ? 'Submitting...' : 'Submit report' }}
+      <button type="submit"
+              [disabled]="submitting() || !reportText().trim() || !victimName().trim() || !scamType()">
+        @if (submitting()) {
+          <span class="spinner"></span> Submitting…
+        } @else {
+          Submit Report
+        }
       </button>
     </div>
 
-    <p *ngIf="successMessage()" class="notice success">{{ successMessage() }}</p>
-    <p *ngIf="errorMessage()" class="notice error">{{ errorMessage() }}</p>
-
-    <p class="hint">Your report helps improve ScamStop and can be used to refine scam detection models.</p>
-
+    <p class="hint">Your report helps improve ScamStop and may be shared with the Philippine National Police.</p>
   </form>
 </div>

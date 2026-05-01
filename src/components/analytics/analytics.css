@@ -3,7 +3,6 @@
   padding: 20px 16px 90px;
   color: #f2f5fb;
   font-family: sans-serif;
-  
 }
 
 :host-context(.light-mode) .analytics-page {
@@ -11,7 +10,7 @@
 }
 
 .analytics-hero {
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .eyebrow {
@@ -23,8 +22,8 @@
 }
 
 .analytics-hero h1 {
-  margin: 0 0 8px;
-  font-size: 24px;
+  margin: 0 0 6px;
+  font-size: 22px;
   line-height: 1.25;
 }
 
@@ -34,6 +33,75 @@
   font-size: 13px;
 }
 
+/* ── Loading / error ──────────────────────────────────────────────────────── */
+.analytics-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 0;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.spinner-lg {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(255,255,255,0.1);
+  border-top-color: #38bdf8;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.analytics-error {
+  text-align: center;
+  padding: 24px 0;
+  color: #f87171;
+  font-size: 13px;
+}
+
+/* ── Totals row ───────────────────────────────────────────────────────────── */
+.totals-row {
+  display: flex;
+  margin-bottom: 14px;
+}
+
+.total-card {
+  flex: 1;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 10px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+:host-context(.light-mode) .total-card {
+  background: #ffffff;
+  border-color: rgba(15,23,42,0.1);
+}
+
+.total-value {
+  font-size: clamp(18px, 4vw, 24px);
+  font-weight: 800;
+  color: #f3f4f6;
+}
+
+:host-context(.light-mode) .total-value {
+  color: #0f172a;
+}
+
+.total-label {
+  font-size: 10px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+/* ── Chart grid ───────────────────────────────────────────────────────────── */
 .chart-grid {
   display: grid;
   gap: 14px;
@@ -55,24 +123,35 @@
 
 .chart-card h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   color: #e5e7eb;
 }
 
+:host-context(.light-mode) .chart-card h2 {
+  color: #0f172a;
+}
+
 .chart-subtitle {
-  margin: 6px 0 14px;
+  margin: 4px 0 12px;
   font-size: 12px;
   color: #9ca3af;
 }
 
+.no-data {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 8px 0 0;
+}
+
+/* ── Bar chart ────────────────────────────────────────────────────────────── */
 .bar-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .bar-row {
   display: grid;
-  grid-template-columns: 72px 1fr 38px;
+  grid-template-columns: 80px 1fr 32px;
   align-items: center;
   gap: 8px;
 }
@@ -82,12 +161,19 @@
   color: #d1d5db;
 }
 
+:host-context(.light-mode) .bar-label {
+  color: #374151;
+}
+
 .area-label {
   font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bar-track {
-  height: 12px;
+  height: 10px;
   background: rgba(55, 65, 81, 0.7);
   border-radius: 999px;
   overflow: hidden;
@@ -100,23 +186,64 @@
 .bar-fill {
   height: 100%;
   border-radius: inherit;
-  transition: width 0.35s ease;
+  transition: width 0.4s ease;
 }
 
-.user-bar {
-  background: linear-gradient(90deg, #38bdf8 0%, #0ea5e9 100%);
-}
-
-.area-bar {
-  background: linear-gradient(90deg, #34d399 0%, #10b981 100%);
-}
-
-.metric-bar {
-  background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
-}
+.user-bar  { background: linear-gradient(90deg, #38bdf8, #0ea5e9); }
+.area-bar  { background: linear-gradient(90deg, #34d399, #10b981); }
+.type-bar  { background: linear-gradient(90deg, #a78bfa, #7c3aed); }
+.metric-bar{ background: linear-gradient(90deg, #fbbf24, #f59e0b); }
 
 .bar-value {
   text-align: right;
-  font-size: 12px;
+  font-size: 11px;
   color: #f3f4f6;
 }
+
+:host-context(.light-mode) .bar-value {
+  color: #0f172a;
+}
+
+/* ── Model metrics state ──────────────────────────────────────────────────── */
+.metrics-state {
+  font-size: 13px;
+  color: #9ca3af;
+  padding: 8px 0;
+}
+
+.metrics-error {
+  color: #f87171;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.retry-btn {
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 2px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: inherit;
+}
+
+.retry-btn:hover {
+  opacity: 0.75;
+}
+
+/* ── Light mode overrides ─────────────────────────────────────────────────── */
+.light-mode .analytics-page  { background: #f8fafc; color: #0f172a; }
+.light-mode .analytics-hero h1 { color: #0f172a; }
+.light-mode .analytics-hero p,
+.light-mode .chart-subtitle   { color: #475569; }
+.light-mode .eyebrow          { color: #0369a1; }
+.light-mode .chart-card       { background: #ffffff; border-color: rgba(15,23,42,0.12); }
+.light-mode .chart-card h2    { color: #0f172a; }
+.light-mode .bar-label        { color: #374151; }
+.light-mode .bar-value        { color: #0f172a; }
+.light-mode .bar-track        { background: rgba(148,163,184,0.45); }
+.light-mode .metrics-state    { color: #475569; }
+.light-mode .total-card       { background: #ffffff; border-color: rgba(15,23,42,0.1); }
+.light-mode .total-value      { color: #0f172a; }
+.light-mode .no-data          { color: #6b7280; }

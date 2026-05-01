@@ -1,10 +1,11 @@
+import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { environment } from '../environments/environment';
 
 const DEFAULT_SETTINGS = {
   enabled: false,
-  apiBase: 'http://127.0.0.1:3000'
+  apiBase: environment.apiUrl
 };
 
 export interface ExtensionSettings {
@@ -81,23 +82,19 @@ export class ExtensionService {
       };
     }
 
-    const data = await this.chrome.storage.sync.get([
-      'enabled',
-      'apiBase',
-      'stats',
-      'detections'
+    // Settings live in sync; stats + detections live in local
+    const [sync, local] = await Promise.all([
+      this.chrome.storage.sync.get(['enabled', 'apiBase']),
+      this.chrome.storage.local.get(['stats', 'recentDetections']),
     ]);
 
     return {
       settings: {
-        enabled:
-          typeof data.enabled === 'boolean'
-            ? data.enabled
-            : DEFAULT_SETTINGS.enabled,
-        apiBase: data.apiBase || DEFAULT_SETTINGS.apiBase
+        enabled: typeof sync.enabled === 'boolean' ? sync.enabled : DEFAULT_SETTINGS.enabled,
+        apiBase: sync.apiBase || DEFAULT_SETTINGS.apiBase,
       },
-      stats: data.stats || { scanned: 0, flagged: 0, safe: 0 },
-      detections: data.detections || []
+      stats: local.stats || { scanned: 0, flagged: 0, safe: 0 },
+      detections: local.recentDetections || [],
     };
   }
 
@@ -232,3 +229,4 @@ export class ExtensionService {
     });
   }
 }
+

@@ -1,27 +1,38 @@
 {
   "manifest_version": 3,
   "name": "ScamStop",
-  "version": "1.0",
-  "description": "ScamStop is a scam detection application designed to help users identify and avoid various types of scams.",
+  "version": "1.0.0",
+  "description": "Real-time scam detection powered by AI. Protects you from scams on Facebook, Instagram, Gmail, Telegram, and more.",
   "permissions": [
     "activeTab",
     "tabs",
     "storage"
   ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "action": {
     "default_title": "ScamStop",
     "default_popup": "index.html"
   },
-  "host_permissions": [
-    "<all_urls>"
-  ],
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://scamstop-api.onrender.com https://firestore.googleapis.com https://firebase.googleapis.com http://ip-api.com https://nominatim.openstreetmap.org https://upload.uploadcare.com https://api.uploadcare.com"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*"],
+      "matches": ["<all_urls>"]
     }
   ]
 }

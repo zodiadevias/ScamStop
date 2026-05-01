@@ -1,69 +1,125 @@
 <div class="home-layout">
+
+  <!-- Shield / scan toggle -->
   <div class="home-page">
-    @if(isScanning()) {
-      <div class="shield">
-        <img src="/assets/img/shield_on.svg" [class.shield-animate]="animateShield()" (animationend)="onShieldAnimationEnd()">
+    <div class="shield">
+      @if (isScanning()) {
+        <img src="/assets/img/shield_on.svg"
+             [class.shield-animate]="animateShield()"
+             (animationend)="onShieldAnimationEnd()"
+             alt="Scanning active" />
         <p>Real-time Scan is ON</p>
         <button (click)="toggleScanning()" class="btn1">Turn OFF</button>
-      </div>
-    }
-
-    @else {
-      <div class="shield">
-        <img src="/assets/img/shield_off.svg" [class.shield-animate]="animateShield()" (animationend)="onShieldAnimationEnd()">
+      } @else {
+        <img src="/assets/img/shield_off.svg"
+             [class.shield-animate]="animateShield()"
+             (animationend)="onShieldAnimationEnd()"
+             alt="Scanning inactive" />
         <p>Real-time Scan is OFF</p>
         <button (click)="toggleScanning()" class="btn1">Turn ON</button>
-      </div>
-    }
+      }
+    </div>
   </div>
 
+  <!-- Stats + detections grid -->
   <div class="home-grid">
-    <div class="grid-card">
+
+    <!-- Stat cards -->
+    <div class="grid-card stat-card">
+      
+      <p class="stat-value">{{ totalScanned() }}</p>
       <h3>Scanned</h3>
-      <p>{{totalScanned}}</p>
     </div>
-    <div class="grid-card">
+    <div class="grid-card stat-card">
+      
+      <p class="stat-value">{{ totalFlagged() }}</p>
       <h3>Flagged</h3>
-      <p>{{totalFlagged}}</p>
     </div>
-    <div class="grid-card">
+    <div class="grid-card stat-card">
+      
+      <p class="stat-value">{{ totalSafe() }}</p>
       <h3>Safe</h3>
-      <p>{{totalSafe}}</p>
     </div>
+
+    <!-- Recent detections -->
     <div class="grid-card full-width detections-card">
-      <h3>Recent Detections</h3>
-      <div class="detections-list">
-        @for (item of recentDetections; track item.message + item.date + item.platform) {
-          <button type="button" class="detection-item" (click)="openDetection(item)">
-            <p class="detection-message">{{ previewMessage(item.message) }}</p>
-            <div class="detection-meta">
-              <span class="detection-date">{{ item.date }}</span>
-              <span class="risk-badge">Risk {{ item.risk }}%</span>
-              <span class="platform-badge">{{ item.platform }}</span>
-            </div>
-          </button>
+      <div class="detections-header">
+        <h3>Recent Detections</h3>
+        @if (recentDetections().length > 0) {
+          <span class="detections-count">{{ recentDetections().length }}</span>
         }
       </div>
+
+      <div class="detections-list">
+
+        @if (detectionsLoading()) {
+          <div class="detections-empty">
+            <span class="empty-icon">⏳</span>
+            <p>Loading detections…</p>
+          </div>
+        } @else if (displayedDetections().length === 0) {
+          <div class="detections-empty">
+            
+            <p>No detections yet.</p>
+            <p class="empty-sub">ScamStop will flag suspicious content as you browse.</p>
+          </div>
+        } @else {
+          @for (item of displayedDetections(); track item.message + item.date + item.platform) {
+            <button type="button" class="detection-item" (click)="openDetection(item)">
+              <div class="detection-row">
+                <span class="risk-indicator risk-{{ getRiskLevel(item.risk) }}"></span>
+                <p class="detection-message">{{ previewMessage(item.message) }}</p>
+              </div>
+              <div class="detection-meta">
+                <span class="detection-date">{{ item.date }}</span>
+                <div class="detection-badges">
+                  <span class="platform-badge">{{ item.platform }}</span>
+                  <span class="risk-badge risk-badge-{{ getRiskLevel(item.risk) }}">
+                    {{ item.risk }}%
+                  </span>
+                </div>
+              </div>
+            </button>
+          }
+        }
+
+      </div>
     </div>
+
   </div>
 </div>
 
+<!-- Detection detail modal -->
 @if (selectedDetection(); as selected) {
   <div class="detection-modal-backdrop" (click)="closeDetection()">
     <div class="detection-modal" (click)="$event.stopPropagation()">
-      <h3>Detection Details</h3>
-      <p class="modal-message">{{ selected.message }}</p>
-      <div class="detection-meta">
-        <span class="detection-date">{{ selected.date }}</span>
-        <span class="risk-badge">Risk {{ selected.risk }}%</span>
-        <span class="platform-badge">{{ selected.platform }}</span>
+
+      <div class="modal-header">
+        <span class="modal-risk-dot risk-{{ getRiskLevel(selected.risk) }}"></span>
+        <h3>Detection Details</h3>
+        <button type="button" class="modal-x" (click)="closeDetection()" aria-label="Close">✕</button>
       </div>
+
+      <p class="modal-message">{{ selected.message }}</p>
+
+      <div class="modal-meta">
+        <span class="detection-date">{{ selected.date }}</span>
+        <span class="platform-badge">{{ selected.platform }}</span>
+        <span class="risk-badge risk-badge-{{ getRiskLevel(selected.risk) }}">
+          Risk {{ selected.risk }}%
+        </span>
+      </div>
+
       <div class="modal-actions">
-        <button type="button" class="modal-report-btn" (click)="goToReportFromDetection(selected.message)">
+        <button type="button" class="modal-report-btn"
+                (click)="goToReportFromDetection(selected.message)">
           Report
         </button>
-        <button type="button" class="modal-close-btn" (click)="closeDetection()">Close</button>
+        <button type="button" class="modal-close-btn" (click)="closeDetection()">
+          Close
+        </button>
       </div>
+
     </div>
   </div>
 }

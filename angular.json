@@ -43,11 +43,20 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "8kB",
-                  "maximumError": "8kB"
+                  "maximumWarning": "12kB",
+                  "maximumError": "16kB"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "none",
+              "inlineStyleLanguage": "css",
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": false
+              }
             },
             "development": {
               "optimization": false,
@@ -64,7 +73,8 @@
               "buildTarget": "ScamStop:build:production"
             },
             "development": {
-              "buildTarget": "ScamStop:build:development"
+              "buildTarget": "ScamStop:build:development",
+              "proxyConfig": "proxy.conf.json"
             }
           },
           "defaultConfiguration": "development"
@@ -76,3 +86,4 @@
     }
   }
 }
+
