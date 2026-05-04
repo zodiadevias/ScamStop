@@ -229,7 +229,7 @@ export class Report implements OnInit {
   submitting     = signal(false);
   successMessage = signal('');
   errorMessage   = signal('');
-  reportStatus   = signal<'pending' | 'verified' | 'rejected' | null>(null);
+  reportStatus   = signal<'pending' | 'verified' | 'rejected' | 'resolved' | 'under_investigation' | 'unresolved' | null>(null);
   reportId       = signal<string | null>(null);
 
   // ── Status lookup ──────────────────────────────────────────────────────────
@@ -238,7 +238,7 @@ export class Report implements OnInit {
   lookupError   = signal('');
   lookupResult  = signal<{
     report_id: string;
-    status: 'pending' | 'verified' | 'rejected';
+    status: 'pending' | 'verified' | 'rejected' | 'resolved' | 'under_investigation' | 'unresolved';
     scam_type: string;
     victim_name: string;
     reported_at: string | null;

@@ -346,9 +346,12 @@
   border: 1px solid;
 }
 
-.lookup-result.status-pending  { color: #fbbf24; background: rgba(251,191,36,0.07);  border-color: rgba(251,191,36,0.25); }
-.lookup-result.status-verified { color: #34d399; background: rgba(52,211,153,0.07);  border-color: rgba(52,211,153,0.25); }
-.lookup-result.status-rejected { color: #f87171; background: rgba(248,113,113,0.07); border-color: rgba(248,113,113,0.25); }
+.lookup-result.status-pending          { color: #fbbf24; background: rgba(251,191,36,0.07);   border-color: rgba(251,191,36,0.25); }
+.lookup-result.status-verified         { color: #34d399; background: rgba(52,211,153,0.07);   border-color: rgba(52,211,153,0.25); }
+.lookup-result.status-rejected         { color: #f87171; background: rgba(248,113,113,0.07);  border-color: rgba(248,113,113,0.25); }
+.lookup-result.status-resolved         { color: #60a5fa; background: rgba(96,165,250,0.07);   border-color: rgba(96,165,250,0.25); }
+.lookup-result.status-under_investigation { color: #c084fc; background: rgba(192,132,252,0.07); border-color: rgba(192,132,252,0.25); }
+.lookup-result.status-unresolved       { color: #fb923c; background: rgba(251,146,60,0.07);   border-color: rgba(251,146,60,0.25); }
 
 .lookup-result-header {
   display: flex;
@@ -466,6 +469,24 @@
   border-color: rgba(248, 113, 113, 0.25);
 }
 
+.status-badge.status-resolved {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.08);
+  border-color: rgba(96, 165, 250, 0.25);
+}
+
+.status-badge.status-under_investigation {
+  color: #c084fc;
+  background: rgba(192, 132, 252, 0.08);
+  border-color: rgba(192, 132, 252, 0.25);
+}
+
+.status-badge.status-unresolved {
+  color: #fb923c;
+  background: rgba(251, 146, 60, 0.08);
+  border-color: rgba(251, 146, 60, 0.25);
+}
+
 .status-dot {
   width: 8px;
   height: 8px;
@@ -476,6 +497,9 @@
 .status-pending  .status-dot { background: #fbbf24; }
 .status-verified .status-dot { background: #34d399; }
 .status-rejected .status-dot { background: #f87171; }
+.status-resolved .status-dot { background: #60a5fa; }
+.status-under_investigation .status-dot { background: #c084fc; }
+.status-unresolved .status-dot { background: #fb923c; }
 
 .status-label {
   flex: 1;

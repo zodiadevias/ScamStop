@@ -25,7 +25,7 @@ export interface ReportPayload {
 
 export interface ReportStatus {
   report_id: string;
-  status: 'pending' | 'verified' | 'rejected';
+  status: 'pending' | 'verified' | 'rejected' | 'resolved' | 'under_investigation' | 'unresolved';
   scam_type: string;
   victim_name: string;
   reported_at: string | null;

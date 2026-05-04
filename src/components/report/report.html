@@ -33,9 +33,12 @@
         <div class="lookup-result-header">
           <span class="status-dot"></span>
           <span class="lookup-status-text">
-            @if (lookupResult()!.status === 'pending')  { Under Review }
-            @if (lookupResult()!.status === 'verified') { Verified }
-            @if (lookupResult()!.status === 'rejected') { Rejected }
+            @if (lookupResult()!.status === 'pending')             { Under Review }
+            @if (lookupResult()!.status === 'verified')            { Verified }
+            @if (lookupResult()!.status === 'rejected')            { Rejected }
+            @if (lookupResult()!.status === 'resolved')            { Resolved }
+            @if (lookupResult()!.status === 'under_investigation') { Under Investigation }
+            @if (lookupResult()!.status === 'unresolved')          { Unresolved }
           </span>
         </div>
         <dl class="lookup-details">
@@ -189,9 +192,12 @@
         <span class="status-dot"></span>
         <span class="status-label">
           Status:
-          @if (reportStatus() === 'pending')  { Under Review }
-          @if (reportStatus() === 'verified') { Verified }
-          @if (reportStatus() === 'rejected') { Rejected }
+          @if (reportStatus() === 'pending')             { Under Review }
+          @if (reportStatus() === 'verified')            { Verified }
+          @if (reportStatus() === 'rejected')            { Rejected }
+          @if (reportStatus() === 'resolved')            { Resolved }
+          @if (reportStatus() === 'under_investigation') { Under Investigation }
+          @if (reportStatus() === 'unresolved')          { Unresolved }
         </span>
         @if (reportId()) {
           <span class="report-id">ID: {{ reportId() }}</span>
