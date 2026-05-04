@@ -1,14 +1,16 @@
 import { Injectable } from '@angular/core';
-import { HttpClient , HttpHeaders} from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../environments/environment';
 
 @Injectable({
   providedIn: 'root',
 })
 export class FileUploader {
   private uploadUrl = 'https://upload.uploadcare.com/base/';
-  private publicKey = '2da00f6da28b5ba3faad';
-  private secretKey = '36f98fe2edddb1c2c430';
+  private publicKey = environment.uploadcare.publicKey;
+  private secretKey = environment.uploadcare.secretKey;
+
   constructor(private http: HttpClient) {}
 
   uploadFile(file: File): Observable<any> {
@@ -20,6 +22,9 @@ export class FileUploader {
   }
 
   deleteFile(uuid: string): Observable<any> {
+    if (!this.secretKey) {
+      throw new Error('Uploadcare secret key not configured. File deletion must be handled server-side.');
+    }
     const url = `https://api.uploadcare.com/files/${uuid}/`;
     const headers = new HttpHeaders({
       'Authorization': `Uploadcare.Simple ${this.publicKey}:${this.secretKey}`,

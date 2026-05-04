@@ -42,17 +42,36 @@
                 <p class="footer-text">Developed for the community of Olongapo City.<br>© 2026 Ambergris Team. All Rights Reserved.</p>
             }
             @if (contentType === 'privacy') {
-                <h3>Information We Collect</h3>
-                <p>We collect information you provide directly to us, including personal information such as name, email, and phone number.</p>
-                
-                <h3>How We Use Your Information</h3>
-                <p>We use the information we collect to provide, maintain, and improve our services, and to communicate with you.</p>
-                
-                <h3>Data Security</h3>
-                <p>We implement appropriate security measures to protect your personal information against unauthorized access.</p>
-                
-                <h3>Your Rights</h3>
-                <p>You have the right to access, update, or delete your personal information at any time.</p>
+                <p class="last-updated">In accordance with Republic Act No. 10173 — Data Privacy Act of 2012</p>
+
+                <h3>1. Personal Information Controller</h3>
+                <p>ScamStop (developed by Team Ambergris) is the Personal Information Controller (PIC) responsible for the personal data you submit through this application.</p>
+
+                <h3>2. What Data We Collect</h3>
+                <p>We collect the following personal data when you use ScamStop:</p>
+                <p><strong>Report form:</strong> Victim's full name, city/location, scam message content, suspect name and contact, amount lost, and evidence files.</p>
+                <p><strong>Real-time scanner:</strong> Text content of posts and messages visible on your screen (Facebook, Instagram, Gmail, Telegram) is sent to our AI server for scam analysis. No content is stored unless you submit a report.</p>
+                <p><strong>Location:</strong> Approximate city-level location via IP address (extension) or device GPS (web), used only to pre-fill the city field.</p>
+
+                <h3>3. Purpose and Legal Basis</h3>
+                <p>Your data is processed to detect scam content, improve our AI model, generate anonymized statistics, and share verified reports with the PNP-ACG for law enforcement. Legal basis: your consent (Section 12(a)) and public safety (Section 12(f)) under RA 10173.</p>
+
+                <h3>4. Data Sharing</h3>
+                <p>Report data may be shared with the <strong>Philippine National Police Anti-Cybercrime Group (PNP-ACG)</strong> for verified cases, and stored via <strong>Firebase (Google Cloud)</strong> and <strong>Uploadcare</strong>. We do not sell your data.</p>
+
+                <h3>5. Data Retention</h3>
+                <p>Reports are retained for a maximum of <strong>3 years</strong> from submission, or until the case is resolved. Personal identifiers are anonymized or deleted after this period.</p>
+
+                <h3>6. Your Rights</h3>
+                <p>Under RA 10173, you have the right to <strong>access, correct, erase, object to, and port</strong> your personal data, and to <strong>withdraw consent</strong> at any time. Use your Report ID to identify your submission and contact us via the About page.</p>
+
+                <h3>7. Security</h3>
+                <p>We use HTTPS encryption, access-controlled cloud storage, and data anonymization for AI training to protect your information.</p>
+
+                <h3>8. Complaints</h3>
+                <p>You may file a complaint with the <strong>National Privacy Commission (NPC)</strong> at complaints&#64;privacy.gov.ph or visit privacy.gov.ph.</p>
+
+                <p class="footer-text">© 2026 Ambergris Team. All Rights Reserved.</p>
             }
             @if (contentType === 'about') {
                 <h3>About ScamStop</h3>

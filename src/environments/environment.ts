@@ -7,6 +7,14 @@ export const environment = {
     highRisk: 70,
     caution: 30
   },
+  uploadcare: {
+    publicKey: '2da00f6da28b5ba3faad',
+    // WARNING: Never commit the real secret key to version control.
+    // Set this via your CI/CD environment or a local .env loader.
+    // For the browser extension context, file deletion should be
+    // handled server-side. Leave empty if not needed client-side.
+    secretKey: ''
+  },
   firebase: {
     apiKey: "AIzaSyCKaSXtn8NFLa1-z9h9c8PB9TtFCBtc1qg",
     authDomain: "scamstop-c262b.firebaseapp.com",

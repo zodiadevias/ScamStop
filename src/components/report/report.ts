@@ -232,6 +232,10 @@ export class Report implements OnInit {
   reportStatus   = signal<'pending' | 'verified' | 'rejected' | 'resolved' | 'under_investigation' | 'unresolved' | null>(null);
   reportId       = signal<string | null>(null);
 
+  // ── Privacy consent ────────────────────────────────────────────────────────
+  consentGiven   = signal(false);
+  showPrivacyModal = signal(false);
+
   // ── Status lookup ──────────────────────────────────────────────────────────
   lookupId      = signal('');
   lookupLoading = signal(false);
@@ -276,6 +280,7 @@ export class Report implements OnInit {
     if (this.isExtensionContext()) {
       // Extensions can't use navigator.geolocation in the popup.
       // ip-api.com works without an API key and allows extension requests.
+      // We only collect city-level data (no precise coordinates) here.
       this.http.get<any>('http://ip-api.com/json/?fields=city,regionName').subscribe({
         next: (res) => {
           const city = res?.city || res?.regionName || '';
@@ -291,7 +296,7 @@ export class Report implements OnInit {
       return;
     }
 
-    // Web context — use precise geolocation with Nominatim reverse-geocode
+    // Web context — ask the user before accessing geolocation
     if (!navigator.geolocation) {
       this.locationError.set('Geolocation not supported. Please type your city manually.');
       this.locationLoading.set(false);
@@ -326,8 +331,8 @@ export class Report implements OnInit {
             },
           });
       },
-      () => {
-        this.locationError.set('Location access denied. Please type your city manually.');
+      (err) => {
+        // User denied or dismissed — not an error, just let them type manually
         this.locationLoading.set(false);
       },
       { timeout: 8000 }
@@ -382,6 +387,10 @@ export class Report implements OnInit {
     if (!name)    { this.errorMessage.set("Please enter the victim's name."); return; }
     if (!type)    { this.errorMessage.set('Please select a scam type.'); return; }
     if (!message) { this.errorMessage.set('Please describe the scam.'); return; }
+    if (!this.consentGiven()) {
+      this.errorMessage.set('Please read and accept the Privacy Notice before submitting.');
+      return;
+    }
 
     this.submitting.set(true);
     this.successMessage.set('');

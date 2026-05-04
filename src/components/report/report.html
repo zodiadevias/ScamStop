@@ -183,6 +183,26 @@
       }
     </div>
 
+    <!-- ── Privacy Consent ──────────────────────────────────────────────── -->
+    <div class="consent-block">
+      <label class="consent-label">
+        <input
+          type="checkbox"
+          class="consent-checkbox"
+          [ngModel]="consentGiven()"
+          (ngModelChange)="consentGiven.set($event)"
+          name="consentGiven"
+        />
+        <span>
+          I have read and agree to the
+          <button type="button" class="privacy-link" (click)="showPrivacyModal.set(true)">
+            Privacy Notice
+          </button>
+          . I consent to ScamStop collecting and processing the personal data in this form for scam reporting purposes under RA 10173.
+        </span>
+      </label>
+    </div>
+
     <!-- Notices -->
     @if (successMessage()) {
       <p class="notice success">{{ successMessage() }}</p>
@@ -210,7 +230,7 @@
 
     <div class="actions">
       <button type="submit"
-              [disabled]="submitting() || !reportText().trim() || !victimName().trim() || !scamType()">
+              [disabled]="submitting() || !reportText().trim() || !victimName().trim() || !scamType() || !consentGiven()">
         @if (submitting()) {
           <span class="spinner"></span> Submitting…
         } @else {
@@ -219,6 +239,86 @@
       </button>
     </div>
 
-    <p class="hint">Your report helps improve ScamStop and may be shared with the Philippine National Police.</p>
+    <p class="hint">Your report helps improve ScamStop and may be shared with the Philippine National Police Anti-Cybercrime Group (PNP-ACG) for law enforcement purposes.</p>
   </form>
 </div>
+
+<!-- ── Privacy Notice Modal ──────────────────────────────────────────────── -->
+@if (showPrivacyModal()) {
+  <div class="privacy-modal-backdrop" (click)="showPrivacyModal.set(false)" role="dialog" aria-modal="true" aria-labelledby="privacy-modal-title">
+    <div class="privacy-modal" (click)="$event.stopPropagation()">
+      <div class="privacy-modal-header">
+        <h2 id="privacy-modal-title">Privacy Notice</h2>
+        <button type="button" class="privacy-modal-close" (click)="showPrivacyModal.set(false)" aria-label="Close">✕</button>
+      </div>
+      <div class="privacy-modal-body">
+
+        <p class="privacy-updated">In accordance with Republic Act No. 10173 — Data Privacy Act of 2012</p>
+
+        <h3>1. Personal Information Controller</h3>
+        <p>ScamStop (developed by Team Ambergris) is the Personal Information Controller (PIC) responsible for the personal data you submit through this application. For privacy-related concerns, contact us through the About page.</p>
+
+        <h3>2. What Data We Collect</h3>
+        <p>When you submit a scam report, we collect the following personal data:</p>
+        <ul>
+          <li><strong>Victim's full name</strong> — to identify the affected party</li>
+          <li><strong>City / location</strong> — to map scam incidents geographically</li>
+          <li><strong>Scam message content</strong> — for AI-based threat analysis and training</li>
+          <li><strong>Suspect name, contact, and alias</strong> — to assist in investigation</li>
+          <li><strong>Amount lost</strong> — for statistical reporting</li>
+          <li><strong>Evidence files (screenshots/PDFs)</strong> — stored securely via Uploadcare</li>
+          <li><strong>Approximate location (city-level)</strong> — auto-detected via IP address or device GPS, used only to pre-fill the city field</li>
+        </ul>
+
+        <h3>3. Purpose and Legal Basis</h3>
+        <p>Your data is collected and processed for the following purposes:</p>
+        <ul>
+          <li>Detecting and flagging scam content to protect other users</li>
+          <li>Improving the accuracy of the ScamStop AI detection model</li>
+          <li>Generating anonymized statistical reports on scam trends</li>
+          <li>Sharing verified reports with the Philippine National Police Anti-Cybercrime Group (PNP-ACG) for law enforcement action</li>
+        </ul>
+        <p>The legal basis for processing is your <strong>freely given, specific, and informed consent</strong> (Section 12(a), RA 10173), and the legitimate purpose of public safety and law enforcement (Section 12(f)).</p>
+
+        <h3>4. Data Sharing</h3>
+        <p>Your report data may be shared with:</p>
+        <ul>
+          <li><strong>Philippine National Police (PNP-ACG)</strong> — for investigation of verified scam cases</li>
+          <li><strong>Firebase / Google Cloud</strong> — our secure cloud database provider</li>
+          <li><strong>Uploadcare</strong> — for secure evidence file storage</li>
+        </ul>
+        <p>We do not sell or share your personal data with advertisers or unrelated third parties.</p>
+
+        <h3>5. Data Retention</h3>
+        <p>Reports are retained for a maximum of <strong>3 years</strong> from the date of submission, or until the associated case is resolved, whichever comes first. After this period, personal identifiers are anonymized or deleted.</p>
+
+        <h3>6. Your Rights as a Data Subject</h3>
+        <p>Under RA 10173, you have the right to:</p>
+        <ul>
+          <li><strong>Access</strong> — request a copy of your personal data we hold</li>
+          <li><strong>Correction</strong> — request correction of inaccurate data</li>
+          <li><strong>Erasure</strong> — request deletion of your data (subject to legal retention requirements)</li>
+          <li><strong>Object</strong> — object to processing of your data</li>
+          <li><strong>Portability</strong> — receive your data in a structured, machine-readable format</li>
+          <li><strong>Withdraw consent</strong> — at any time, without affecting the lawfulness of prior processing</li>
+        </ul>
+        <p>To exercise these rights, use your Report ID to identify your submission and contact us through the About page.</p>
+
+        <h3>7. Security Measures</h3>
+        <p>We implement appropriate technical and organizational measures to protect your personal data, including encrypted data transmission (HTTPS), access-controlled cloud storage, and anonymization of data used for AI training.</p>
+
+        <h3>8. Complaints</h3>
+        <p>If you believe your data privacy rights have been violated, you may file a complaint with the <strong>National Privacy Commission (NPC)</strong> at <em>complaints&#64;privacy.gov.ph</em> or visit <em>privacy.gov.ph</em>.</p>
+
+      </div>
+      <div class="privacy-modal-footer">
+        <button type="button" class="privacy-accept-btn" (click)="consentGiven.set(true); showPrivacyModal.set(false)">
+          I Understand and Consent
+        </button>
+        <button type="button" class="privacy-close-btn" (click)="showPrivacyModal.set(false)">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+}
