@@ -26,8 +26,6 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!local.recentDetections) {
     await chrome.storage.local.set({ recentDetections: [] });
   }
-
-  console.log('ScamStop installed — API base set to', DEFAULT_SETTINGS.apiBase);
 });
 
 // ---------------------------------------------------------------------------
@@ -142,11 +140,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         const body = await response.json();
         const scamProbability = Number(body?.scam_probability || 0);
         const isScam = !!body?.is_scam;
+        const detectionMethod = body?.detection_method || null;
 
         // Always record — popup reads from local storage
         await recordDetection(text, url, scamProbability, isScam);
 
-        sendResponse({ ok: true, result: { scamProbability, isScam } });
+        sendResponse({ ok: true, result: { scamProbability, isScam, detectionMethod } });
       } catch (err) {
         sendResponse({ ok: false, error: String(err?.message || err) });
       }

@@ -143,6 +143,8 @@ export class ScamDetectionService {
     scam_type: string;
     victim_name: string;
     reported_at: string | null;
+    admin_reply?: string | null;
+    replied_at?: string | null;
   }> {
     if (this.isExtensionContext()) {
       return from(

@@ -50,6 +50,17 @@
             <dt>Submitted</dt><dd>{{ lookupResult()!.reported_at | date:'medium' }}</dd>
           }
         </dl>
+        @if (lookupResult()!.admin_reply) {
+          <div class="admin-reply">
+            <p class="admin-reply-label">
+              Admin Reply
+              @if (lookupResult()!.replied_at) {
+                <span class="admin-reply-date">· {{ lookupResult()!.replied_at | date:'medium' }}</span>
+              }
+            </p>
+            <p class="admin-reply-text">{{ lookupResult()!.admin_reply }}</p>
+          </div>
+        }
       </div>
     }
   </section>

@@ -208,6 +208,77 @@ _load_safe_samples()
 
 
 # ---------------------------------------------------------------------------
+# Local CSV samples store  (no Firestore cost)
+# Admin-uploaded CSV rows are written to local .jsonl files.
+# Scam rows → csv_scam_samples.jsonl
+# Safe rows → csv_safe_samples.jsonl
+# Both are read at retrain time and cleared afterwards.
+# ---------------------------------------------------------------------------
+CSV_SCAM_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'csv_scam_samples.jsonl')
+CSV_SAFE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'csv_safe_samples.jsonl')
+
+csv_scam_texts: list[str] = []
+csv_safe_texts: list[str] = []
+_csv_lock = threading.Lock()
+
+def _load_csv_samples():
+    global csv_scam_texts, csv_safe_texts
+    def _read(path):
+        texts = []
+        if not os.path.exists(path):
+            return texts
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        texts.append(json.loads(line).get('text', ''))
+                    except Exception:
+                        pass
+        return [t for t in texts if t]
+    csv_scam_texts = _read(CSV_SCAM_PATH)
+    csv_safe_texts = _read(CSV_SAFE_PATH)
+    print(f"[INFO] Loaded {len(csv_scam_texts)} CSV scam, {len(csv_safe_texts)} CSV safe samples.")
+
+def _append_csv_samples(items: list[dict]):
+    """Write a batch of {text, label} items to the appropriate local file."""
+    global csv_scam_texts, csv_safe_texts
+    with _csv_lock:
+        scam_lines, safe_lines = [], []
+        for item in items:
+            text      = (item.get('text') or '').strip()[:500]
+            label     = item.get('label')
+            if not text:
+                continue
+            label_int = 1 if str(label).lower() in ('1', 'scam', 'spam', 'yes', 'true') else 0
+            entry     = json.dumps({'text': text}) + '\n'
+            if label_int == 1:
+                scam_lines.append(entry)
+                csv_scam_texts.append(text)
+            else:
+                safe_lines.append(entry)
+                csv_safe_texts.append(text)
+        if scam_lines:
+            with open(CSV_SCAM_PATH, 'a', encoding='utf-8') as f:
+                f.writelines(scam_lines)
+        if safe_lines:
+            with open(CSV_SAFE_PATH, 'a', encoding='utf-8') as f:
+                f.writelines(safe_lines)
+
+def _clear_csv_samples():
+    global csv_scam_texts, csv_safe_texts
+    with _csv_lock:
+        csv_scam_texts = []
+        csv_safe_texts = []
+        for path in (CSV_SCAM_PATH, CSV_SAFE_PATH):
+            if os.path.exists(path):
+                os.remove(path)
+    print("[PURGE] Cleared local CSV sample files.")
+
+_load_csv_samples()
+
+
+# ---------------------------------------------------------------------------
 # In-memory LSH cache  (refreshed every 30 min — reduced from 5 min)
 # ---------------------------------------------------------------------------
 lsh_cache: set = set()
@@ -353,15 +424,11 @@ def _delete_collection(collection_name: str, batch_size: int = 400):
 def _do_retrain():
     """
     Training data sources:
+      SCAM (label=1): keywords.text + CSV scam uploads
+      SAFE (label=0): local safe_samples.jsonl + CSV safe uploads
 
-    SCAM (label=1):
-      1. reports.message   — where status == 'verified'
-      2. keywords.text     — every keyword phrase
-      3. samples           — CSV-uploaded rows where label == 1 (scam)
-
-    SAFE (label=0):
-      1. safe_samples.text — messages stored when /api/detect returned SAFE
-      2. samples           — CSV-uploaded rows where label == 0 (safe)
+    Evaluation uses a proper train/test split with the full hybrid
+    (LSH + NLP) pipeline so metrics reflect real-world performance.
     """
     global model, cached_metrics
 
@@ -373,6 +440,7 @@ def _do_retrain():
         f1_score, roc_auc_score, confusion_matrix,
         classification_report,
     )
+    from datasketch import MinHashLSH
 
     print("[RETRAIN] Starting retrain job...")
 
@@ -392,19 +460,14 @@ def _do_retrain():
             scam_texts.append(kw)
             counts['keywords'] += 1
 
-    # ── SCAM 2 / SAFE 2: CSV-uploaded samples ─────────────────────────────
-    for doc in db.collection('samples').stream():
-        d     = doc.to_dict()
-        text  = (d.get('text') or '').strip()
-        label = d.get('label')
-        if not text:
-            continue
-        if label == 1:
-            scam_texts.append(text)
-            counts['csv_scam'] += 1
-        elif label == 0:
-            safe_texts.append(text)
-            counts['csv_safe'] += 1
+    # ── SCAM 2: CSV-uploaded scam samples (local file) ────────────────────
+    with _csv_lock:
+        local_csv_scam = list(csv_scam_texts)
+        local_csv_safe = list(csv_safe_texts)
+    scam_texts.extend(local_csv_scam)
+    safe_texts.extend(local_csv_safe)
+    counts['csv_scam'] = len(local_csv_scam)
+    counts['csv_safe'] = len(local_csv_safe)
 
     # ── SAFE 1: local safe_samples file ───────────────────────────────────
     with _safe_samples_lock:
@@ -412,18 +475,19 @@ def _do_retrain():
     safe_texts.extend(local_safe)
     counts['safe_samples'] = len(local_safe)
 
+    # Deduplicate to prevent accuracy inflation from repeated samples
+    scam_texts = list(dict.fromkeys(scam_texts))
+    safe_texts  = list(dict.fromkeys(safe_texts))
+
     print(f"[RETRAIN] Dataset — "
-          f"scam: {len(scam_texts)} "
-          f"(keywords={counts['keywords']}, csv={counts['csv_scam']}) | "
-          f"safe: {len(safe_texts)} "
-          f"(safe_samples={counts['safe_samples']}, csv={counts['csv_safe']})")
+          f"scam: {len(scam_texts)} (keywords={counts['keywords']}, csv={counts['csv_scam']}) | "
+          f"safe: {len(safe_texts)} (safe_samples={counts['safe_samples']}, csv={counts['csv_safe']})")
 
     # ── Validate ──────────────────────────────────────────────────────────
     MIN_SAMPLES = 10
     if len(scam_texts) < MIN_SAMPLES:
         msg = (f"Not enough scam samples ({len(scam_texts)}). "
-               f"Need at least {MIN_SAMPLES}. "
-               f"Verify more reports or add more keywords.")
+               f"Need at least {MIN_SAMPLES}. Add more keywords or upload a CSV.")
         print(f"[RETRAIN] Aborted — {msg}")
         return False, msg, {}
 
@@ -444,7 +508,7 @@ def _do_retrain():
         safe_texts.extend(fillers * ((MIN_SAMPLES // len(fillers)) + 1))
         safe_texts = safe_texts[:max(len(scam_texts), MIN_SAMPLES)]
 
-    # ── Build dataset ─────────────────────────────────────────────────────
+    # ── Train / test split ────────────────────────────────────────────────
     X = scam_texts + safe_texts
     y = [1] * len(scam_texts) + [0] * len(safe_texts)
 
@@ -452,29 +516,64 @@ def _do_retrain():
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    # ── Retrain ───────────────────────────────────────────────────────────
+    # ── Train TF-IDF + Naive Bayes on training split only ─────────────────
     vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_features=50000)
     X_train_vec = vectorizer.fit_transform(X_train)
-    X_test_vec  = vectorizer.transform(X_test)
-
-    classifier = MultinomialNB()
+    classifier  = MultinomialNB()
     classifier.fit(X_train_vec, y_train)
 
-    # ── Evaluate ──────────────────────────────────────────────────────────
-    y_pred  = classifier.predict(X_test_vec)
-    y_proba = classifier.predict_proba(X_test_vec)[:, 1]
+    # ── Build a temporary LSH index from training scam texts only ─────────
+    # This mirrors real-world usage: LSH is queried first, NLP second.
+    lsh_threshold = model.lsh_threshold if model else 0.5
+    num_perm      = model.num_perm      if model else 128
+    temp_lsh = MinHashLSH(threshold=lsh_threshold, num_perm=num_perm)
+    for i, txt in enumerate(X_train):
+        if y_train[i] == 1:
+            try:
+                mh = MinHash(num_perm=num_perm)
+                for word in txt.lower().split():
+                    mh.update(word.encode('utf8'))
+                temp_lsh.insert(f"train_{i}", mh)
+            except Exception:
+                pass
 
+    # ── Evaluate on unseen test set using the full hybrid pipeline ─────────
+    y_pred:  list[int]   = []
+    y_proba: list[float] = []
+
+    for msg in X_test:
+        # Tier 1: LSH near-duplicate check
+        mh = MinHash(num_perm=num_perm)
+        for word in msg.lower().split():
+            mh.update(word.encode('utf8'))
+
+        try:
+            lsh_hits = temp_lsh.query(mh)
+        except Exception:
+            lsh_hits = []
+
+        if lsh_hits:
+            y_pred.append(1)
+            y_proba.append(1.0)
+        else:
+            # Tier 2: NLP classifier
+            vec = vectorizer.transform([msg])
+            p   = classifier.predict_proba(vec)[0][1]
+            y_proba.append(float(p))
+            y_pred.append(1 if p > 0.7 else 0)
+
+    # ── Compute metrics ───────────────────────────────────────────────────
     cm = confusion_matrix(y_test, y_pred).tolist()
     cr = classification_report(y_test, y_pred, output_dict=True)
 
     performance = {
         'performance_metrics': {
-            'accuracy':  round(accuracy_score(y_test, y_pred), 4),
-            'precision': round(precision_score(y_test, y_pred, zero_division=0), 4),
-            'recall':    round(recall_score(y_test, y_pred, zero_division=0), 4),
-            'f1_score':  round(f1_score(y_test, y_pred, zero_division=0), 4),
-            'auc_roc':   round(roc_auc_score(y_test, y_proba), 4),
-            'lsh_similarity_threshold': model.lsh_threshold if model else 0.5,
+            'accuracy':               round(accuracy_score(y_test, y_pred),                    4),
+            'precision':              round(precision_score(y_test, y_pred, zero_division=0),  4),
+            'recall':                 round(recall_score(y_test, y_pred, zero_division=0),     4),
+            'f1_score':               round(f1_score(y_test, y_pred, zero_division=0),         4),
+            'auc_roc':                round(roc_auc_score(y_test, y_proba),                    4),
+            'lsh_similarity_threshold': lsh_threshold,
         },
         'confusion_matrix': {
             'true_negative':  cm[0][0],
@@ -483,13 +582,13 @@ def _do_retrain():
             'true_positive':  cm[1][1],
         },
         'lsh_configurations': {
-            'hash_functions_k':      model.num_perm if model else 128,
+            'hash_functions_k':      num_perm,
             'bands_b':               _lsh_b(model),
             'rows_per_band_r':       _lsh_r(model),
-            'lsh_threshold':         model.lsh_threshold if model else 0.5,
+            'lsh_threshold':         lsh_threshold,
             'minhash_shingle_size':  'Word-based (1-gram)',
             'vocabulary_size_tfidf': len(vectorizer.vocabulary_),
-            'avg_query_time_ms':     _measure_query_time(model),
+            'avg_query_time_ms':     _measure_query_time(model) if model else 0.0,
         },
         'classification_report': cr,
     }
@@ -499,9 +598,12 @@ def _do_retrain():
     model.classifier       = classifier
     model.performance_data = performance
     cached_metrics         = performance
+    _cache_invalidate('metrics')
 
     joblib.dump(model, MODEL_PATH)
     print(f"[RETRAIN] Done — saved to {MODEL_PATH}")
+    print(f"[RETRAIN] Accuracy={performance['performance_metrics']['accuracy']}, "
+          f"F1={performance['performance_metrics']['f1_score']}")
 
     # ── Log to Firestore ──────────────────────────────────────────────────
     db.collection('retrain_log').add({
@@ -519,7 +621,7 @@ def _do_retrain():
 
     # ── Purge consumed training data ──────────────────────────────────────
     _clear_safe_samples_file()
-    _delete_collection('samples')
+    _clear_csv_samples()
     print("[RETRAIN] Purged training data.")
 
     return True, 'Retrain completed successfully.', {
@@ -529,7 +631,6 @@ def _do_retrain():
         'accuracy':        performance['performance_metrics']['accuracy'],
         'f1_score':        performance['performance_metrics']['f1_score'],
     }
-
 
 def run_retrain(triggered_by: str = 'scheduler'):
     global retrain_status
@@ -624,7 +725,6 @@ def parse_predict_result(result: str):
 # ---------------------------------------------------------------------------
 
 @app.route('/api/detect', methods=['POST'])
-@limiter.limit("30 per minute; 200 per hour")
 def detect_scam():
     if not model:
         return jsonify({'error': 'Model Offline'}), 500
@@ -746,40 +846,43 @@ def get_retrain_status():
 @limiter.limit("20 per hour")
 def add_samples_bulk():
     """Bulk-add labeled training samples from CSV upload.
-    label=1/scam → stored in `samples` collection (scam)
-    label=0/safe → stored in `samples` collection (safe)
-    Both are picked up by _do_retrain().
+    Samples are stored in local .jsonl files on the server — zero Firestore cost.
+    They are read at retrain time and cleared afterwards.
     """
     if request.method == 'OPTIONS':
         return '', 204
 
     data   = request.get_json(silent=True) or {}
     items  = data.get('samples', [])
-    source = data.get('source', 'csv')
-    added  = 0
-    errors = []
 
-    batch = db.batch()
+    if not items:
+        return jsonify({'added': 0, 'errors': ['No samples provided']}), 400
+
+    valid   = []
+    errors  = []
     for i, item in enumerate(items):
         text  = (item.get('text') or '').strip()
         label = item.get('label')
         if not text or label is None:
             errors.append(f"Item {i}: missing text or label")
             continue
-        label_int = 1 if str(label).lower() in ('1', 'scam', 'spam', 'yes', 'true') else 0
-        ref = db.collection('samples').document()
-        batch.set(ref, {
-            'text':     text[:500],   # cap to save storage
-            'label':    label_int,
-            'source':   source,
-            'added_at': firestore.SERVER_TIMESTAMP,
+        valid.append({'text': text, 'label': label})
+
+    if valid:
+        _append_csv_samples(valid)
+
+    return jsonify({'added': len(valid), 'errors': errors}), 201
+
+
+@app.route('/api/samples/status', methods=['GET'])
+def get_samples_status():
+    """Returns the count of CSV samples currently cached on the server."""
+    with _csv_lock:
+        return jsonify({
+            'csv_scam': len(csv_scam_texts),
+            'csv_safe': len(csv_safe_texts),
+            'total':    len(csv_scam_texts) + len(csv_safe_texts),
         })
-        added += 1
-
-    if added:
-        batch.commit()
-
-    return jsonify({'added': added, 'errors': errors}), 201
 
 
 @app.route('/api/stats/flag', methods=['POST'])
@@ -817,18 +920,6 @@ def report_scam():
     if not msg:
         return jsonify({'error': 'No message provided'}), 400
 
-    m     = model._get_minhash(msg)
-    bands = list(model._get_bands(m))
-
-    def write_band(band_idx_hash):
-        band_idx, band_hash = band_idx_hash
-        doc_ref = db.collection(f'lsh_index/band_{band_idx}/hashes').document(band_hash)
-        doc_ref.set({'reported_at': firestore.SERVER_TIMESTAMP}, merge=True)
-        lsh_cache.add(band_hash)
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        executor.map(write_band, bands)
-
     report_doc = {
         'message':     msg,
         'reported_at': firestore.SERVER_TIMESTAMP,
@@ -849,107 +940,31 @@ def report_scam():
     if suspect_contact: report_doc['suspect_contact']  = suspect_contact
     if amount_lost:     report_doc['amount_lost']      = amount_lost
 
+    # Write the report document first — this is what the user waits for
     _, report_ref = db.collection('reports').add(report_doc)
+
+    # Write LSH band hashes in the background — don't block the response
+    def _write_bands():
+        try:
+            m     = model._get_minhash(msg)
+            bands = list(model._get_bands(m))
+            def write_band(band_idx_hash):
+                band_idx, band_hash = band_idx_hash
+                doc_ref = db.collection(f'lsh_index/band_{band_idx}/hashes').document(band_hash)
+                doc_ref.set({'reported_at': firestore.SERVER_TIMESTAMP}, merge=True)
+                lsh_cache.add(band_hash)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                executor.map(write_band, bands)
+        except Exception as e:
+            print(f"[WARN] Background LSH write failed: {e}")
+
+    threading.Thread(target=_write_bands, daemon=True).start()
 
     return jsonify({
         'status':        'Report submitted and LSH index updated',
         'report_id':     report_ref.id,
         'report_status': 'pending',
     })
-
-
-@app.route('/api/analytics', methods=['GET'])
-def get_analytics():
-    """
-    Aggregates report data from Firestore for the analytics dashboard.
-    Returns:
-      - reports_by_day:  last 7 days, count per day label (Mon–Sun)
-      - reports_by_city: top 10 cities by report count
-      - reports_by_type: count per scam type
-      - totals:          total, pending, verified, rejected counts
-    Cached for 5 minutes.
-    """
-    cached = _cache_get('analytics')
-    if cached:
-        return jsonify(cached)
-
-    try:
-        docs = list(db.collection('reports').stream())
-    except Exception as e:
-        return jsonify({'error': f'Could not fetch reports: {e}'}), 500
-
-    from collections import defaultdict
-
-    day_counts  = defaultdict(int)   # 'Mon' → count
-    city_counts = defaultdict(int)
-    type_counts = defaultdict(int)
-    totals      = {'total': 0, 'pending': 0, 'verified': 0, 'rejected': 0}
-
-    # Build a window of the last 7 days
-    today = datetime.datetime.utcnow().date()
-    day_labels = {}
-    for i in range(6, -1, -1):
-        d = today - datetime.timedelta(days=i)
-        label = d.strftime('%a')   # Mon, Tue, …
-        day_labels[d.isoformat()] = label
-        day_counts[label] = 0      # seed with 0
-
-    for doc in docs:
-        d = doc.to_dict()
-        totals['total'] += 1
-
-        status = d.get('status', 'pending')
-        if status in totals:
-            totals[status] += 1
-
-        # Day bucket
-        ts = d.get('reported_at')
-        if ts:
-            try:
-                date_str = ts.date().isoformat()
-                if date_str in day_labels:
-                    day_counts[day_labels[date_str]] += 1
-            except Exception:
-                pass
-
-        # City bucket
-        city = (d.get('city') or '').strip()
-        if city:
-            city_counts[city] += 1
-
-        # Scam type bucket
-        scam_type = (d.get('scam_type') or '').strip()
-        if scam_type:
-            type_counts[scam_type] += 1
-
-    # Sort day counts in Mon→Sun order
-    day_order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    reports_by_day = [
-        {'label': day, 'value': day_counts.get(day, 0)}
-        for day in day_order
-    ]
-
-    # Top 10 cities
-    reports_by_city = sorted(
-        [{'label': k, 'value': v} for k, v in city_counts.items()],
-        key=lambda x: x['value'], reverse=True
-    )[:10]
-
-    # All scam types sorted by count
-    reports_by_type = sorted(
-        [{'label': k, 'value': v} for k, v in type_counts.items()],
-        key=lambda x: x['value'], reverse=True
-    )
-
-    result = {
-        'reports_by_day':  reports_by_day,
-        'reports_by_city': reports_by_city,
-        'reports_by_type': reports_by_type,
-        'totals':          totals,
-    }
-
-    _cache_set('analytics', result)
-    return jsonify(result)
 
 
 @app.route('/api/update-index', methods=['POST'])
@@ -970,6 +985,8 @@ def get_report_status(report_id):
         'scam_type':   data.get('scam_type', ''),
         'victim_name': data.get('victim_name', ''),
         'reported_at': data.get('reported_at').isoformat() if data.get('reported_at') else None,
+        'admin_reply': data.get('admin_reply', ''),
+        'replied_at':  data.get('replied_at').isoformat() if data.get('replied_at') else None,
     })
 
 
@@ -982,11 +999,26 @@ def rate_limit_handler(e):
 
 
 @app.route('/api/health', methods=['GET'])
-def health():    return jsonify({
-        'status':       'ok',
-        'model_loaded': model is not None,
-        'keywords':     len(keyword_cache),
-        'lsh_hashes':   len(lsh_cache),
+def health():
+    model_path_exists = os.path.exists(MODEL_PATH)
+    firebase_ok = True
+    try:
+        db.collection('_health').limit(1).stream()
+    except Exception:
+        firebase_ok = False
+
+    return jsonify({
+        'status':            'ok' if model is not None else 'degraded',
+        'model_loaded':      model is not None,
+        'model_path':        MODEL_PATH,
+        'model_file_exists': model_path_exists,
+        'has_metrics':       cached_metrics is not None,
+        'firebase_ok':       firebase_ok,
+        'keywords_cached':   len(keyword_cache),
+        'lsh_hashes_cached': len(lsh_cache),
+        'csv_scam_cached':   len(csv_scam_texts),
+        'csv_safe_cached':   len(csv_safe_texts),
+        'safe_samples_cached': len(safe_samples_texts),
     })
 
 

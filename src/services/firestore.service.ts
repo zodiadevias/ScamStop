@@ -2,11 +2,36 @@ import { Injectable } from '@angular/core';
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import {
   getFirestore, Firestore,
-  collection, getDocs, query, orderBy, Timestamp
+  collection, getDocs, getDoc, addDoc, doc,
+  query, orderBy, serverTimestamp, Timestamp
 } from 'firebase/firestore';
 import { from, Observable } from 'rxjs';
 import { environment } from '../environments/environment';
 import { AnalyticsData, BarDatum } from './scam-detection.service';
+
+export interface ReportPayload {
+  message: string;
+  victim_name?: string | null;
+  scam_type?: string | null;
+  url?: string | null;
+  evidence_url?: string | null;
+  city?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  suspect_name?: string | null;
+  suspect_contact?: string | null;
+  amount_lost?: string | null;
+}
+
+export interface ReportStatus {
+  report_id: string;
+  status: 'pending' | 'verified' | 'rejected';
+  scam_type: string;
+  victim_name: string;
+  reported_at: string | null;
+  admin_reply?: string | null;
+  replied_at?: string | null;
+}
 
 @Injectable({ providedIn: 'root' })
 export class FirestoreService {
@@ -20,6 +45,65 @@ export class FirestoreService {
       : initializeApp(environment.firebase);
     this.db = getFirestore(this.app);
   }
+
+  // ── Report submission ──────────────────────────────────────────────────────
+
+  submitReport(payload: ReportPayload): Observable<{ report_id: string; report_status: string }> {
+    return from(this._submitReport(payload));
+  }
+
+  private async _submitReport(payload: ReportPayload) {
+    const doc: Record<string, any> = {
+      message:     payload.message,
+      reported_at: serverTimestamp(),
+      status:      'pending',
+    };
+
+    // Only include defined, non-null fields
+    const optional: (keyof ReportPayload)[] = [
+      'victim_name', 'scam_type', 'url', 'evidence_url',
+      'city', 'latitude', 'longitude',
+      'suspect_name', 'suspect_contact', 'amount_lost',
+    ];
+    for (const key of optional) {
+      if (payload[key] != null && payload[key] !== '') {
+        doc[key] = payload[key];
+      }
+    }
+
+    const ref = await addDoc(collection(this.db, 'reports'), doc);
+    return { report_id: ref.id, report_status: 'pending' };
+  }
+
+  // ── Report status lookup ───────────────────────────────────────────────────
+
+  getReportStatus(reportId: string): Observable<ReportStatus> {
+    return from(this._getReportStatus(reportId));
+  }
+
+  private async _getReportStatus(reportId: string): Promise<ReportStatus> {
+    const snap = await getDoc(doc(this.db, 'reports', reportId));
+    if (!snap.exists()) {
+      const err: any = new Error('Report not found.');
+      err.status = 404;
+      throw err;
+    }
+    const d = snap.data();
+    const toIso = (ts: any) =>
+      ts instanceof Timestamp ? ts.toDate().toISOString() : null;
+
+    return {
+      report_id:   snap.id,
+      status:      (d['status'] ?? 'pending') as ReportStatus['status'],
+      scam_type:   d['scam_type']   ?? '',
+      victim_name: d['victim_name'] ?? '',
+      reported_at: toIso(d['reported_at']),
+      admin_reply: d['admin_reply'] ?? null,
+      replied_at:  toIso(d['replied_at']),
+    };
+  }
+
+  // ── Analytics ──────────────────────────────────────────────────────────────
 
   /**
    * Reads all documents from the `reports` collection and aggregates:
@@ -54,8 +138,8 @@ export class FirestoreService {
       if (!dayCount.has(label)) dayCount.set(label, 0);
     }
 
-    snap.forEach(doc => {
-      const d = doc.data();
+    snap.forEach(docSnap => {
+      const d = docSnap.data();
       totals.total++;
 
       const status = (d['status'] ?? 'pending') as string;

@@ -8,11 +8,12 @@ export const environment = {
     caution: 30
   },
   firebase: {
-    apiKey: 'AIzaSyBO48yr60ksID6My_SvT-g6Tpr759Xc44A',
-    authDomain: 'scamstop-33d4e.firebaseapp.com',
-    projectId: 'scamstop-33d4e',
-    storageBucket: 'scamstop-33d4e.firebasestorage.app',
-    messagingSenderId: '512588918965',
-    appId: '1:512588918965:web:c5028d1e89e5d8d8548efc'
+    apiKey: "AIzaSyCKaSXtn8NFLa1-z9h9c8PB9TtFCBtc1qg",
+    authDomain: "scamstop-c262b.firebaseapp.com",
+    projectId: "scamstop-c262b",
+    storageBucket: "scamstop-c262b.firebasestorage.app",
+    messagingSenderId: "678255885730",
+    appId: "1:678255885730:web:bb13db50b7e85a7f3e46fb",
+    measurementId: "G-SS27643Q7E"
   }
 };

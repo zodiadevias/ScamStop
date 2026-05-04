@@ -3,8 +3,8 @@ import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
-import { ScamDetectionService } from '../../services/scam-detection.service';
 import { FileUploader } from '../../services/file-uploader';
+import { FirestoreService } from '../../services/firestore.service';
 import { switchMap, of } from 'rxjs';
 
 export const SCAM_TYPES = [
@@ -17,6 +17,7 @@ export const SCAM_TYPES = [
   'Lottery / Prize Scam',
   'Tech Support Scam',
   'Identity Theft',
+  'Child Predator',
   'Other',
 ] as const;
 
@@ -241,10 +242,12 @@ export class Report implements OnInit {
     scam_type: string;
     victim_name: string;
     reported_at: string | null;
+    admin_reply?: string | null;
+    replied_at?: string | null;
   } | null>(null);
 
   constructor(
-    private scamDetection: ScamDetectionService,
+    private firestoreService: FirestoreService,
     private fileUploader: FileUploader,
     private http: HttpClient,
     private route: ActivatedRoute
@@ -341,7 +344,7 @@ export class Report implements OnInit {
     this.lookupError.set('');
     this.lookupResult.set(null);
 
-    this.scamDetection.checkReportStatus(id).subscribe({
+    this.firestoreService.getReportStatus(id).subscribe({
       next: (res) => { this.lookupResult.set(res); this.lookupLoading.set(false); },
       error: (err) => {
         this.lookupError.set(
@@ -384,31 +387,30 @@ export class Report implements OnInit {
     this.successMessage.set('');
     this.errorMessage.set('');
 
-    const file     = this.selectedFile();
-    const upload$  = file ? this.fileUploader.uploadFile(file) : of(null);
+    const file    = this.selectedFile();
+    const upload$ = file ? this.fileUploader.uploadFile(file) : of(null);
 
     upload$.pipe(
       switchMap((uploadRes: any) => {
-        // File URL from Uploadcare (if a file was attached)
         const fileUrl = uploadRes?.file
           ? `https://dy4jlo0hs3.ucarecd.net/${uploadRes.file}/`
           : null;
 
         if (fileUrl) this.uploadedFileUrl.set(fileUrl);
 
-        const suspiciousUrl = this.urlInput().trim() || null;
-
-        return this.scamDetection.reportScam(message, {
+        return this.firestoreService.submitReport({
+          message,
           victim_name:     name,
           scam_type:       type,
-          url:             suspiciousUrl,
+          url:             this.urlInput().trim() || null,
           evidence_url:    fileUrl,
           city:            this.city().trim() || null,
           latitude:        this.coords()?.lat ?? null,
           longitude:       this.coords()?.lng ?? null,
           suspect_name:    this.suspectName().trim()    || null,
           suspect_contact: this.suspectContact().trim() || null,
-          amount_lost:     this.amountLost() != null && this.amountLost() !== '' ? String(this.amountLost()) : null,
+          amount_lost:     this.amountLost() != null && this.amountLost() !== ''
+                             ? String(this.amountLost()) : null,
         });
       })
     ).subscribe({
