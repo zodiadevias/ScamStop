@@ -281,7 +281,7 @@ export class Report implements OnInit {
       // Extensions can't use navigator.geolocation in the popup.
       // ip-api.com works without an API key and allows extension requests.
       // We only collect city-level data (no precise coordinates) here.
-      this.http.get<any>('http://ip-api.com/json/?fields=city,regionName').subscribe({
+      this.http.get<any>('https://ip-api.com/json/?fields=city,regionName').subscribe({
         next: (res) => {
           const city = res?.city || res?.regionName || '';
           this.city.set(city);

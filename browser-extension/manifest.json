@@ -5,7 +5,6 @@
   "description": "Real-time scam detection powered by AI. Protects you from scams on Facebook, Instagram, Gmail, Telegram, and more.",
   "permissions": [
     "activeTab",
-    "tabs",
     "storage"
   ],
   "host_permissions": [
@@ -27,7 +26,7 @@
     }
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://scamstop-api.onrender.com https://firestore.googleapis.com https://firebase.googleapis.com http://ip-api.com https://nominatim.openstreetmap.org https://upload.uploadcare.com https://api.uploadcare.com"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://scamstop-api.onrender.com https://firestore.googleapis.com https://firebase.googleapis.com https://ip-api.com https://nominatim.openstreetmap.org https://upload.uploadcare.com https://api.uploadcare.com"
   },
   "web_accessible_resources": [
     {

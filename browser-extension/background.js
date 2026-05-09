@@ -1,6 +1,5 @@
 const DEFAULT_SETTINGS = {
   enabled: true,
-  // TODO: Replace with your Render URL before publishing
   apiBase: 'https://scamstop-api.onrender.com'
 };
 

@@ -429,6 +429,6 @@ function showFullContentModal(text, risk, links = [], detectionMethod = null) {
   document.body.appendChild(root);
 }
 
-function getRiskLevel(p) { return p >= 70 ? 'high' : (p >= 40 ? 'medium' : 'low'); }
+function getRiskLevel(p) { return p >= 85 ? 'high' : (p >= 40 ? 'medium' : 'low'); }
 function isElementVisible(el) { const r = el.getBoundingClientRect(); return r.top < window.innerHeight && r.bottom > 0; }
 function sendMessage(msg) { return new Promise(res => chrome.runtime.sendMessage(msg, r => res(r))); }
