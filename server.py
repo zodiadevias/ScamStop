@@ -713,7 +713,12 @@ def parse_predict_result(result: str):
     if 'Keyword Match' in result:
         return True, 99.0, 'Keyword'
     if result.startswith("SCAM (Detected via LSH"):
-        return True, 99.0, "LSH"
+        # LSH is a binary detector — it fires when Jaccard similarity >= threshold (0.5).
+        # The actual similarity is unknown without storing original MinHash objects.
+        # We report the threshold as the minimum guaranteed similarity score,
+        # scaled to a probability: threshold * 100, floored at 50%.
+        lsh_prob = round(model.lsh_threshold * 100) if model else 50.0
+        return True, lsh_prob, "LSH"
     match = re.search(r'Confidence:\s*([\d.]+)%', result)
     if match:
         return True, round(float(match.group(1)), 2), "NLP"
