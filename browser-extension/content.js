@@ -128,7 +128,7 @@ function queueElementForScoring(element) {
 async function scoreAndMark(element) {
   const links = extractLinks(element);
   const text  = extractText(element);   // already includes [links: ...] suffix
-  if (!text || text.length < 10) return;
+  if (!text || text.length < 3) return;
 
   // Pass the current page URL so the background can record it
   const response = await sendMessage({
