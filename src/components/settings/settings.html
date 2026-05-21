@@ -21,6 +21,23 @@
   <section class="settings-card">
     <div class="setting-row">
       <div>
+        <h2>Show Detection Method</h2>
+        <p>Display how a scam was detected (NLP, LSH, Keyword) on the risk badge.</p>
+      </div>
+      <button
+        type="button"
+        class="toggle-btn"
+        [class.active]="showDetectionMethod()"
+        (click)="toggleDetectionMethod()"
+      >
+        {{ showDetectionMethod() ? 'ON' : 'OFF' }}
+      </button>
+    </div>
+  </section>
+
+  <section class="settings-card">
+    <div class="setting-row">
+      <div>
         <h2>About</h2>
         <p>View ScamStop details, features, and legal info.</p>
       </div>

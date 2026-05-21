@@ -1,6 +1,7 @@
 const DEFAULT_SETTINGS = {
   enabled: true,
-  apiBase: 'https://scamstop-api.onrender.com'
+  apiBase: 'https://scamstop-api.onrender.com',
+  showDetectionMethod: true,
 };
 
 // ---------------------------------------------------------------------------
@@ -12,9 +13,12 @@ chrome.runtime.onInstalled.addListener(async () => {
     apiBase: DEFAULT_SETTINGS.apiBase,
   });
 
-  const current = await chrome.storage.sync.get(['enabled']);
+  const current = await chrome.storage.sync.get(['enabled', 'showDetectionMethod']);
   if (typeof current.enabled !== 'boolean') {
     await chrome.storage.sync.set({ enabled: DEFAULT_SETTINGS.enabled });
+  }
+  if (typeof current.showDetectionMethod !== 'boolean') {
+    await chrome.storage.sync.set({ showDetectionMethod: DEFAULT_SETTINGS.showDetectionMethod });
   }
 
   // Seed stats + detections in local storage (larger quota, no sync needed)
@@ -82,7 +86,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'get-settings') {
     (async () => {
       const [sync, local] = await Promise.all([
-        chrome.storage.sync.get(['enabled', 'apiBase']),
+        chrome.storage.sync.get(['enabled', 'apiBase', 'showDetectionMethod']),
         chrome.storage.local.get(['stats', 'recentDetections']),
       ]);
       sendResponse({
@@ -90,6 +94,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         settings: {
           enabled: typeof sync.enabled === 'boolean' ? sync.enabled : DEFAULT_SETTINGS.enabled,
           apiBase: sync.apiBase || DEFAULT_SETTINGS.apiBase,
+          showDetectionMethod: typeof sync.showDetectionMethod === 'boolean'
+            ? sync.showDetectionMethod
+            : DEFAULT_SETTINGS.showDetectionMethod,
         },
         stats: local.stats || { scanned: 0, flagged: 0, safe: 0 },
         detections: local.recentDetections || [],
@@ -101,6 +108,24 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   // ── Toggle enabled ────────────────────────────────────────────────────────
   if (message.type === 'set-enabled') {
     chrome.storage.sync.set({ enabled: !!message.enabled }, () => sendResponse({ ok: true }));
+    return true;
+  }
+
+  // ── Toggle show detection method label ────────────────────────────────────
+  if (message.type === 'set-show-detection-method') {
+    chrome.storage.sync.set({ showDetectionMethod: !!message.show }, () => {
+      // Broadcast to all tabs so content scripts update badges immediately
+      chrome.tabs.query({}, (tabs) => {
+        for (const tab of tabs) {
+          if (!tab?.id) continue;
+          chrome.tabs.sendMessage(tab.id, {
+            type: 'UPDATE_DETECTION_METHOD',
+            show: !!message.show
+          }).catch(() => {});
+        }
+      });
+      sendResponse({ ok: true });
+    });
     return true;
   }
 
@@ -257,8 +282,34 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  // ── Flag as scam (user-initiated from modal) ─────────────────────────────
+  if (message.type === 'flag-scam') {
+    const text = message.text || '';
+    const url  = message.url  || '';
+    if (!text.trim()) { sendResponse({ ok: false, error: 'No text provided.' }); return false; }
+
+    (async () => {
+      const apiBase = await getApiBase();
+      try {
+        const response = await fetch(`${apiBase}/api/flag-scam`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, url }),
+        });
+        if (!response.ok) {
+          sendResponse({ ok: false, error: `API returned ${response.status}` });
+          return;
+        }
+        const data = await response.json();
+        sendResponse({ ok: true, data });
+      } catch (err) {
+        sendResponse({ ok: false, error: String(err?.message || err) });
+      }
+    })();
+    return true;
+  }
+
   sendResponse({ ok: false, error: 'Unsupported message type' });
   return false;
 });
-
 

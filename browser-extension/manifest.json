@@ -5,6 +5,7 @@
   "description": "Real-time scam detection powered by AI. Protects you from scams on Facebook, Instagram, Gmail, Telegram, and more.",
   "permissions": [
     "activeTab",
+    "tabs",
     "storage"
   ],
   "host_permissions": [

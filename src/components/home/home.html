@@ -111,6 +111,14 @@
       </div>
 
       <div class="modal-actions">
+        <button type="button" class="modal-flag-btn"
+                [disabled]="flagState() === 'loading' || flagState() === 'done'"
+                (click)="flagDetection(selected.message, selected.platform)">
+          @if (flagState() === 'idle')    { Flag as Scam }
+          @if (flagState() === 'loading') { Flagging… }
+          @if (flagState() === 'done')    { ✓ Flagged }
+          @if (flagState() === 'error')   { ✗ Failed — retry }
+        </button>
         <button type="button" class="modal-report-btn"
                 (click)="goToReportFromDetection(selected.message)">
           Report

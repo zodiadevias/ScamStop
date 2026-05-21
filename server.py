@@ -6,7 +6,6 @@ import hashlib
 import joblib
 import threading
 import datetime
-import concurrent.futures
 import firebase_admin
 from firebase_admin import credentials, firestore
 from flask import Flask, request, jsonify
@@ -57,25 +56,30 @@ db = firestore.client()
 # ---------------------------------------------------------------------------
 # ScamStopEngine
 # ---------------------------------------------------------------------------
+SHINGLE_SIZE = 3   # character n-gram size used for MinHash shingling (matches v3.ipynb)
+
 class ScamStopEngine:
-    def __init__(self, lsh_threshold=0.5, num_perm=128, b=20, r=4):
+    def __init__(self, lsh_threshold=0.9, num_perm=128, b=20, r=4):
         from datasketch import MinHashLSH
         from sklearn.feature_extraction.text import TfidfVectorizer
         from sklearn.naive_bayes import MultinomialNB
 
-        self.vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_features=50000)
-        self.classifier = MultinomialNB()
-        self.lsh = MinHashLSH(threshold=lsh_threshold, num_perm=num_perm)
-        self.num_perm = num_perm
+        self.vectorizer    = TfidfVectorizer(ngram_range=(1, 2), max_features=10000)
+        self.classifier    = MultinomialNB()
+        self.lsh           = MinHashLSH(threshold=lsh_threshold, num_perm=num_perm)
+        self.lsh_minhashes = {}   # key → MinHash — used to compute actual Jaccard similarity
+        self.num_perm      = num_perm
         self.lsh_threshold = lsh_threshold
-        self.b = b
-        self.r = r
+        self.b             = b
+        self.r             = r
         self.performance_data = None
 
     def _get_minhash(self, text):
         m = MinHash(num_perm=self.num_perm)
-        for word in str(text).lower().split():
-            m.update(word.encode('utf8'))
+        # Character-level n-grams — resilient against adversarial typos (e.g. "fr3e", "GCa$h")
+        clean = ' '.join(str(text).lower().split())
+        for i in range(max(1, len(clean) - SHINGLE_SIZE + 1)):
+            m.update(clean[i:i + SHINGLE_SIZE].encode('utf8'))
         return m
 
     def _get_bands(self, m):
@@ -95,11 +99,26 @@ class ScamStopEngine:
             if kw in msg_lower:
                 return f"SCAM (Detected via Keyword Match: '{kw}')"
 
-        # Tier 1: LSH near-duplicate
-        m = self._get_minhash(message)
-        for _, band_hash in self._get_bands(m):
-            if band_hash in lsh_cache:
-                return "SCAM (Detected via LSH Near-Duplicate)"
+        # Tier 1: LSH near-duplicate — compute actual Jaccard similarity
+        mh = self._get_minhash(message)
+        try:
+            hits = self.lsh.query(mh)
+            if hits:
+                # Compute actual Jaccard against all matched MinHashes, take the max
+                best_similarity = 0.0
+                minhashes = getattr(self, 'lsh_minhashes', {})
+                for key in hits:
+                    stored_mh = minhashes.get(key)
+                    if stored_mh is not None:
+                        sim = mh.jaccard(stored_mh)
+                        if sim > best_similarity:
+                            best_similarity = sim
+                # Fall back to threshold if no stored MinHashes found
+                if best_similarity == 0.0:
+                    best_similarity = self.lsh_threshold
+                return f"SCAM (Detected via LSH Near-Duplicate, Similarity: {best_similarity*100:.2f}%)"
+        except Exception:
+            pass
 
         # Tier 2: NLP classifier
         tfidf_msg = self.vectorizer.transform([message])
@@ -112,7 +131,8 @@ class ScamStopEngine:
 # ---------------------------------------------------------------------------
 # Model loading
 # ---------------------------------------------------------------------------
-MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src', 'AI-model', 'scam_stop_engine.joblib')
+MODEL_PATH        = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src', 'AI-model', 'scam_stop_engine.joblib')
+MODEL_BACKUP_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src', 'AI-model', 'scam_stop_engine.backup.joblib')
 SAFE_SAMPLES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'safe_samples.jsonl')
 
 def load_model():
@@ -149,21 +169,24 @@ print("[INFO] Metrics ready." if cached_metrics else "[WARN] No performance_data
 if model:
     b = getattr(model, 'b', None) or getattr(model.lsh, '_b', '?')
     r = getattr(model, 'r', None) or getattr(model.lsh, '_r', '?')
-    print(f"[INFO] LSH config — num_perm={model.num_perm}, bands={b}, rows_per_band={r}")
+    mh_count = len(getattr(model, 'lsh_minhashes', {}))
+    print(f"[INFO] LSH config — num_perm={model.num_perm}, bands={b}, rows_per_band={r}, stored_minhashes={mh_count}")
+    if mh_count == 0:
+        print("[WARN] lsh_minhashes is empty — LSH similarity will fall back to threshold value. Re-run model.ipynb and re-upload the .joblib.")
 
 
 # ---------------------------------------------------------------------------
 # Local safe-samples store  (no Firestore cost)
+# Texts are written to disk only — no in-memory list to avoid unbounded RAM.
+# A hash set is kept in memory solely for fast deduplication on write.
 # ---------------------------------------------------------------------------
-safe_samples_set: set[str] = set()   # stores SHA-256 hashes of seen texts
-safe_samples_texts: list[str] = []   # stores the actual texts for retraining
+safe_samples_set: set[str] = set()   # SHA-256 hashes for dedup — small footprint
 _safe_samples_lock = threading.Lock()
 
-def _load_safe_samples():
-    global safe_samples_texts
+def _load_safe_sample_hashes():
+    """Load only the hashes from the safe_samples file into memory for dedup."""
     if not os.path.exists(SAFE_SAMPLES_PATH):
         return
-    texts = []
     hashes = set()
     with open(SAFE_SAMPLES_PATH, 'r', encoding='utf-8') as f:
         for line in f:
@@ -171,78 +194,74 @@ def _load_safe_samples():
             if not line:
                 continue
             try:
-                obj = json.loads(line)
-                text = obj.get('text', '').strip()
-                h    = obj.get('hash', '')
-                if text and h:
-                    texts.append(text)
+                h = json.loads(line).get('hash', '')
+                if h:
                     hashes.add(h)
             except Exception:
                 pass
-    safe_samples_texts = texts
     safe_samples_set.update(hashes)
-    print(f"[INFO] Loaded {len(texts)} safe samples from local file.")
+    print(f"[INFO] Loaded {len(hashes)} safe sample hashes for dedup.")
 
 def _append_safe_sample(text: str):
-    """Append a new safe sample to the local file (deduplicated)."""
+    """Append a new safe sample to the local file (deduplicated, file-only)."""
     h = hashlib.sha256(text.encode('utf-8')).hexdigest()
     with _safe_samples_lock:
         if h in safe_samples_set:
             return   # already seen — skip
         safe_samples_set.add(h)
-        safe_samples_texts.append(text)
         with open(SAFE_SAMPLES_PATH, 'a', encoding='utf-8') as f:
             f.write(json.dumps({'text': text[:500], 'hash': h}) + '\n')
 
+def _stream_safe_samples():
+    """Yield safe sample texts from disk one at a time — no full load into RAM."""
+    if not os.path.exists(SAFE_SAMPLES_PATH):
+        return
+    with open(SAFE_SAMPLES_PATH, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                text = json.loads(line).get('text', '').strip()
+                if text:
+                    yield text
+            except Exception:
+                pass
+
+def _count_safe_samples() -> int:
+    if not os.path.exists(SAFE_SAMPLES_PATH):
+        return 0
+    count = 0
+    with open(SAFE_SAMPLES_PATH, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.strip():
+                count += 1
+    return count
+
 def _clear_safe_samples_file():
-    """Called after retraining — wipe the file and in-memory store."""
-    global safe_samples_texts
+    """Called after retraining — wipe the file and hash set."""
     with _safe_samples_lock:
-        safe_samples_texts = []
         safe_samples_set.clear()
         if os.path.exists(SAFE_SAMPLES_PATH):
             os.remove(SAFE_SAMPLES_PATH)
     print("[PURGE] Cleared local safe_samples file.")
 
-_load_safe_samples()
+_load_safe_sample_hashes()
 
 
 # ---------------------------------------------------------------------------
 # Local CSV samples store  (no Firestore cost)
-# Admin-uploaded CSV rows are written to local .jsonl files.
-# Scam rows → csv_scam_samples.jsonl
-# Safe rows → csv_safe_samples.jsonl
-# Both are read at retrain time and cleared afterwards.
+# Admin-uploaded CSV rows are written to local .jsonl files — disk only.
+# No in-memory lists: avoids OOM when uploading 300k+ row datasets.
 # ---------------------------------------------------------------------------
 CSV_SCAM_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'csv_scam_samples.jsonl')
 CSV_SAFE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'csv_safe_samples.jsonl')
 
-csv_scam_texts: list[str] = []
-csv_safe_texts: list[str] = []
 _csv_lock = threading.Lock()
 
-def _load_csv_samples():
-    global csv_scam_texts, csv_safe_texts
-    def _read(path):
-        texts = []
-        if not os.path.exists(path):
-            return texts
-        with open(path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        texts.append(json.loads(line).get('text', ''))
-                    except Exception:
-                        pass
-        return [t for t in texts if t]
-    csv_scam_texts = _read(CSV_SCAM_PATH)
-    csv_safe_texts = _read(CSV_SAFE_PATH)
-    print(f"[INFO] Loaded {len(csv_scam_texts)} CSV scam, {len(csv_safe_texts)} CSV safe samples.")
-
 def _append_csv_samples(items: list[dict]):
-    """Write a batch of {text, label} items to the appropriate local file."""
-    global csv_scam_texts, csv_safe_texts
+    """Write a batch of {text, label} items to the appropriate local file.
+    No in-memory accumulation — data lives on disk only until retrain."""
     with _csv_lock:
         scam_lines, safe_lines = [], []
         for item in items:
@@ -254,10 +273,8 @@ def _append_csv_samples(items: list[dict]):
             entry     = json.dumps({'text': text}) + '\n'
             if label_int == 1:
                 scam_lines.append(entry)
-                csv_scam_texts.append(text)
             else:
                 safe_lines.append(entry)
-                csv_safe_texts.append(text)
         if scam_lines:
             with open(CSV_SCAM_PATH, 'a', encoding='utf-8') as f:
                 f.writelines(scam_lines)
@@ -265,52 +282,46 @@ def _append_csv_samples(items: list[dict]):
             with open(CSV_SAFE_PATH, 'a', encoding='utf-8') as f:
                 f.writelines(safe_lines)
 
+def _stream_csv_texts(path: str):
+    """Yield texts from a .jsonl file one line at a time — no full load into RAM."""
+    if not os.path.exists(path):
+        return
+    with open(path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                text = json.loads(line).get('text', '').strip()
+                if text:
+                    yield text
+            except Exception:
+                pass
+
+def _count_csv_lines(path: str) -> int:
+    """Count lines in a .jsonl file without loading content into memory."""
+    if not os.path.exists(path):
+        return 0
+    count = 0
+    with open(path, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.strip():
+                count += 1
+    return count
+
 def _clear_csv_samples():
-    global csv_scam_texts, csv_safe_texts
     with _csv_lock:
-        csv_scam_texts = []
-        csv_safe_texts = []
         for path in (CSV_SCAM_PATH, CSV_SAFE_PATH):
             if os.path.exists(path):
                 os.remove(path)
     print("[PURGE] Cleared local CSV sample files.")
 
-_load_csv_samples()
-
 
 # ---------------------------------------------------------------------------
-# In-memory LSH cache  (refreshed every 30 min — reduced from 5 min)
-# ---------------------------------------------------------------------------
-lsh_cache: set = set()
-LSH_CACHE_REFRESH_INTERVAL = 1800   # 30 minutes (was 5 min)
-
-def build_lsh_cache():
-    global lsh_cache
-    new_cache = set()
-    try:
-        b = getattr(model, 'b', None) or getattr(model.lsh, '_b', 20) if model else 20
-        for band_idx in range(b):
-            docs = db.collection(f'lsh_index/band_{band_idx}/hashes').stream()
-            for doc in docs:
-                new_cache.add(doc.id)
-        lsh_cache = new_cache
-        print(f"[INFO] LSH cache refreshed — {len(lsh_cache)} hashes loaded.")
-    except Exception as e:
-        print(f"[WARN] LSH cache refresh failed: {e}")
-
-def schedule_cache_refresh():
-    build_lsh_cache()
-    timer = threading.Timer(LSH_CACHE_REFRESH_INTERVAL, schedule_cache_refresh)
-    timer.daemon = True
-    timer.start()
-
-threading.Thread(target=schedule_cache_refresh, daemon=True).start()
-
-
-# ---------------------------------------------------------------------------
-# In-memory keyword cache  (refreshed every 5 min)
+# In-memory keyword cache  (refreshed every 30 min)
 # ---------------------------------------------------------------------------
 keyword_cache: set = set()
+LSH_CACHE_REFRESH_INTERVAL = 1800   # 30 minutes
 
 def build_keyword_cache():
     global keyword_cache
@@ -421,14 +432,22 @@ def _delete_collection(collection_name: str, batch_size: int = 400):
 # ---------------------------------------------------------------------------
 # Core retrain function
 # ---------------------------------------------------------------------------
-def _do_retrain():
+def _do_retrain(triggered_by: str = 'scheduler'):
     """
-    Training data sources:
-      SCAM (label=1): keywords.text + CSV scam uploads
-      SAFE (label=0): local safe_samples.jsonl + CSV safe uploads
+    Retrains the model using the same pipeline as revised_nlp.ipynb:
+      - TfidfVectorizer (1-2 ngrams, 10 000 features)
+      - MultinomialNB classifier
+      - MinHashLSH rebuilt from scam training texts
 
-    Evaluation uses a proper train/test split with the full hybrid
-    (LSH + NLP) pipeline so metrics reflect real-world performance.
+    Old data is RETAINED across retrains — CSV and safe-sample files are NOT
+    purged, so each retrain builds on all accumulated data.
+
+    Memory guard: dataset is capped at MAX_SCAM + MAX_SAFE rows to stay
+    within Render free tier's 512MB limit.
+
+    Training data sources:
+      SCAM (label=1): keywords collection + CSV scam uploads
+      SAFE (label=0): safe_samples.jsonl + CSV safe uploads
     """
     global model, cached_metrics
 
@@ -441,58 +460,88 @@ def _do_retrain():
         classification_report,
     )
     from datasketch import MinHashLSH
+    import numpy as np
 
-    print("[RETRAIN] Starting retrain job...")
+    print("[RETRAIN] Starting retrain job (notebook-compatible pipeline)...")
+
+    # ── Collect all texts into memory (capped) ────────────────────────────
+    # Cap per class to stay within 512MB on Render free tier.
+    MAX_SCAM = 50_000
+    MAX_SAFE = 50_000
 
     scam_texts: list[str] = []
     safe_texts: list[str] = []
-    counts = {
-        'keywords':     0,
-        'csv_scam':     0,
-        'safe_samples': 0,
-        'csv_safe':     0,
-    }
+    counts = {'keywords': 0, 'csv_scam': 0, 'reports': 0, 'safe_samples': 0, 'csv_safe': 0}
 
-    # ── SCAM 1: keywords ──────────────────────────────────────────────────
+    # SCAM: keywords from Firestore
     for doc in db.collection('keywords').stream():
         kw = (doc.to_dict().get('text') or '').strip()
         if kw:
             scam_texts.append(kw)
             counts['keywords'] += 1
 
-    # ── SCAM 2: CSV-uploaded scam samples (local file) ────────────────────
-    with _csv_lock:
-        local_csv_scam = list(csv_scam_texts)
-        local_csv_safe = list(csv_safe_texts)
-    scam_texts.extend(local_csv_scam)
-    safe_texts.extend(local_csv_safe)
-    counts['csv_scam'] = len(local_csv_scam)
-    counts['csv_safe'] = len(local_csv_safe)
+    # SCAM: verified reports from Firestore (persistent across deploys)
+    for doc in db.collection('reports').where('status', '==', 'verified').stream():
+        if len(scam_texts) >= MAX_SCAM:
+            break
+        msg = (doc.to_dict().get('message') or '').strip()
+        if msg:
+            scam_texts.append(msg)
+            counts['reports'] += 1
 
-    # ── SAFE 1: local safe_samples file ───────────────────────────────────
-    with _safe_samples_lock:
-        local_safe = list(safe_samples_texts)
-    safe_texts.extend(local_safe)
-    counts['safe_samples'] = len(local_safe)
+    # SCAM: user-flagged messages from extension modals
+    for doc in db.collection('user_flagged').stream():
+        if len(scam_texts) >= MAX_SCAM:
+            break
+        msg = (doc.to_dict().get('text') or '').strip()
+        if msg:
+            scam_texts.append(msg)
+            counts.setdefault('user_flagged', 0)
+            counts['user_flagged'] += 1
 
-    # Deduplicate to prevent accuracy inflation from repeated samples
+    # SCAM: CSV uploads (streamed — ephemeral, may be empty after redeploy)
+    for txt in _stream_csv_texts(CSV_SCAM_PATH):
+        if len(scam_texts) >= MAX_SCAM:
+            break
+        scam_texts.append(txt)
+        counts['csv_scam'] += 1
+
+    # SAFE: safe_samples.jsonl (streamed)
+    for txt in _stream_safe_samples():
+        if len(safe_texts) >= MAX_SAFE:
+            break
+        safe_texts.append(txt)
+        counts['safe_samples'] += 1
+
+    # SAFE: CSV uploads (streamed)
+    for txt in _stream_csv_texts(CSV_SAFE_PATH):
+        if len(safe_texts) >= MAX_SAFE:
+            break
+        safe_texts.append(txt)
+        counts['csv_safe'] += 1
+
+    # Deduplicate
     scam_texts = list(dict.fromkeys(scam_texts))
     safe_texts  = list(dict.fromkeys(safe_texts))
 
+    total_scam = len(scam_texts)
+    total_safe = len(safe_texts)
+
     print(f"[RETRAIN] Dataset — "
-          f"scam: {len(scam_texts)} (keywords={counts['keywords']}, csv={counts['csv_scam']}) | "
-          f"safe: {len(safe_texts)} (safe_samples={counts['safe_samples']}, csv={counts['csv_safe']})")
+          f"scam: {total_scam} (keywords={counts['keywords']}, reports={counts['reports']}, csv={counts['csv_scam']}) | "
+          f"safe: {total_safe} (safe_samples={counts['safe_samples']}, csv={counts['csv_safe']})")
 
     # ── Validate ──────────────────────────────────────────────────────────
-    MIN_SAMPLES = 10
-    if len(scam_texts) < MIN_SAMPLES:
-        msg = (f"Not enough scam samples ({len(scam_texts)}). "
-               f"Need at least {MIN_SAMPLES}. Add more keywords or upload a CSV.")
+    MIN_SAMPLES = 5
+    if total_scam < MIN_SAMPLES:
+        msg = (f"Not enough scam samples ({total_scam}). "
+               f"Need at least {MIN_SAMPLES}. "
+               f"Add more keywords or upload a CSV with scam samples.")
         print(f"[RETRAIN] Aborted — {msg}")
         return False, msg, {}
 
-    # Pad safe_texts with neutral fillers if still sparse
-    if len(safe_texts) < MIN_SAMPLES:
+    # Pad safe texts with neutral fillers if sparse
+    if total_safe < MIN_SAMPLES:
         fillers = [
             "Hello, how are you today?",
             "The weather is nice outside.",
@@ -506,73 +555,82 @@ def _do_retrain():
             "The report is ready for review.",
         ]
         safe_texts.extend(fillers * ((MIN_SAMPLES // len(fillers)) + 1))
-        safe_texts = safe_texts[:max(len(scam_texts), MIN_SAMPLES)]
+        safe_texts = safe_texts[:max(total_scam, MIN_SAMPLES)]
+        total_safe = len(safe_texts)
 
-    # ── Train / test split ────────────────────────────────────────────────
+    # ── Train / test split (mirrors notebook) ─────────────────────────────
     X = scam_texts + safe_texts
-    y = [1] * len(scam_texts) + [0] * len(safe_texts)
+    y = [1] * total_scam + [0] * total_safe
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
+        X, y, test_size=0.20, random_state=42, stratify=y
     )
 
-    # ── Train TF-IDF + Naive Bayes on training split only ─────────────────
-    vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_features=50000)
+    # ── TF-IDF + Naive Bayes (mirrors notebook) ───────────────────────────
+    print("[RETRAIN] Training TF-IDF + Naive Bayes...")
+    vectorizer  = TfidfVectorizer(ngram_range=(1, 2), max_features=10000)
     X_train_vec = vectorizer.fit_transform(X_train)
     classifier  = MultinomialNB()
     classifier.fit(X_train_vec, y_train)
 
-    # ── Build a temporary LSH index from training scam texts only ─────────
-    # This mirrors real-world usage: LSH is queried first, NLP second.
-    lsh_threshold = model.lsh_threshold if model else 0.5
+    # ── Rebuild MinHashLSH from scam training texts (mirrors notebook) ────
+    lsh_threshold = model.lsh_threshold if model else 0.9
     num_perm      = model.num_perm      if model else 128
-    temp_lsh = MinHashLSH(threshold=lsh_threshold, num_perm=num_perm)
+    print("[RETRAIN] Rebuilding LSH index from scam training texts...")
+    new_lsh        = MinHashLSH(threshold=lsh_threshold, num_perm=num_perm)
+    new_minhashes  = {}   # key → MinHash for actual Jaccard computation
     for i, txt in enumerate(X_train):
         if y_train[i] == 1:
             try:
                 mh = MinHash(num_perm=num_perm)
-                for word in txt.lower().split():
-                    mh.update(word.encode('utf8'))
-                temp_lsh.insert(f"train_{i}", mh)
+                clean = ' '.join(txt.lower().split())
+                for i in range(max(1, len(clean) - SHINGLE_SIZE + 1)):
+                    mh.update(clean[i:i + SHINGLE_SIZE].encode('utf8'))
+                new_lsh.insert(f'scam_{i}', mh)
+                new_minhashes[f'scam_{i}'] = mh
             except Exception:
                 pass
 
-    # ── Evaluate on unseen test set using the full hybrid pipeline ─────────
+    # ── Evaluate hybrid pipeline on test set (mirrors notebook) ──────────
+    print("[RETRAIN] Evaluating hybrid pipeline on test set...")
     y_pred:  list[int]   = []
     y_proba: list[float] = []
+    tier_hits = {'LSH': 0, 'NLP': 0}
 
     for msg in X_test:
-        # Tier 1: LSH near-duplicate check
         mh = MinHash(num_perm=num_perm)
-        for word in msg.lower().split():
-            mh.update(word.encode('utf8'))
-
+        clean = ' '.join(msg.lower().split())
+        for i in range(max(1, len(clean) - SHINGLE_SIZE + 1)):
+            mh.update(clean[i:i + SHINGLE_SIZE].encode('utf8'))
         try:
-            lsh_hits = temp_lsh.query(mh)
+            hits = new_lsh.query(mh)
         except Exception:
-            lsh_hits = []
-
-        if lsh_hits:
+            hits = []
+        if hits:
             y_pred.append(1)
-            y_proba.append(1.0)
+            y_proba.append(0.99)
+            tier_hits['LSH'] += 1
         else:
-            # Tier 2: NLP classifier
-            vec = vectorizer.transform([msg])
-            p   = classifier.predict_proba(vec)[0][1]
+            p = classifier.predict_proba(vectorizer.transform([msg]))[0][1]
             y_proba.append(float(p))
             y_pred.append(1 if p > 0.7 else 0)
+            tier_hits['NLP'] += 1
+
+    print(f"[RETRAIN] LSH hits: {tier_hits['LSH']}  NLP hits: {tier_hits['NLP']}")
 
     # ── Compute metrics ───────────────────────────────────────────────────
     cm = confusion_matrix(y_test, y_pred).tolist()
     cr = classification_report(y_test, y_pred, output_dict=True)
+    b  = getattr(new_lsh, '_b', model.b if model else 20)
+    r  = getattr(new_lsh, '_r', model.r if model else 4)
 
     performance = {
         'performance_metrics': {
-            'accuracy':               round(accuracy_score(y_test, y_pred),                    4),
-            'precision':              round(precision_score(y_test, y_pred, zero_division=0),  4),
-            'recall':                 round(recall_score(y_test, y_pred, zero_division=0),     4),
-            'f1_score':               round(f1_score(y_test, y_pred, zero_division=0),         4),
-            'auc_roc':                round(roc_auc_score(y_test, y_proba),                    4),
+            'accuracy':                 round(accuracy_score(y_test, y_pred),                   4),
+            'precision':                round(precision_score(y_test, y_pred, zero_division=0), 4),
+            'recall':                   round(recall_score(y_test, y_pred, zero_division=0),    4),
+            'f1_score':                 round(f1_score(y_test, y_pred, zero_division=0),        4),
+            'auc_roc':                  round(roc_auc_score(y_test, y_proba),                   4),
             'lsh_similarity_threshold': lsh_threshold,
         },
         'confusion_matrix': {
@@ -583,19 +641,45 @@ def _do_retrain():
         },
         'lsh_configurations': {
             'hash_functions_k':      num_perm,
-            'bands_b':               _lsh_b(model),
-            'rows_per_band_r':       _lsh_r(model),
+            'bands_b':               b,
+            'rows_per_band_r':       r,
             'lsh_threshold':         lsh_threshold,
-            'minhash_shingle_size':  'Word-based (1-gram)',
+            'minhash_shingle_size':  f'Character-based ({SHINGLE_SIZE}-gram)',
             'vocabulary_size_tfidf': len(vectorizer.vocabulary_),
-            'avg_query_time_ms':     _measure_query_time(model) if model else 0.0,
+            'avg_query_time_ms':     0.0,   # filled after model is patched below
         },
         'classification_report': cr,
     }
 
+    # ── Backup current model before patching (enables rollback) ──────────
+    if os.path.exists(MODEL_PATH):
+        import shutil
+        shutil.copy2(MODEL_PATH, MODEL_BACKUP_PATH)
+        print(f"[RETRAIN] Backed up current model to {MODEL_BACKUP_PATH}")
+
     # ── Patch live model and save ─────────────────────────────────────────
+    # If model is None (no .joblib on disk — e.g. fresh Render deploy),
+    # create a new ScamStopEngine instance to hold the trained components.
+    if model is None:
+        print("[RETRAIN] No model in memory — creating new ScamStopEngine instance.")
+        model = ScamStopEngine(
+            lsh_threshold=lsh_threshold,
+            num_perm=num_perm,
+        )
+
     model.vectorizer       = vectorizer
     model.classifier       = classifier
+    model.lsh              = new_lsh
+    model.lsh_minhashes    = new_minhashes
+    model.b                = b
+    model.r                = r
+    model.performance_data = None   # clear first so _measure_query_time uses new components
+    cached_metrics         = None
+    _cache_invalidate('metrics')
+
+    # Now benchmark with the freshly patched model
+    performance['lsh_configurations']['avg_query_time_ms'] = _measure_query_time(model)
+
     model.performance_data = performance
     cached_metrics         = performance
     _cache_invalidate('metrics')
@@ -608,25 +692,25 @@ def _do_retrain():
     # ── Log to Firestore ──────────────────────────────────────────────────
     db.collection('retrain_log').add({
         'retrained_at':    firestore.SERVER_TIMESTAMP,
-        'scam_samples':    len(scam_texts),
-        'safe_samples':    len(safe_texts),
+        'scam_samples':    total_scam,
+        'safe_samples':    total_safe,
         'keywords':        counts['keywords'],
+        'reports':         counts['reports'],
         'csv_scam':        counts['csv_scam'],
         'safe_samples_db': counts['safe_samples'],
         'csv_safe':        counts['csv_safe'],
         'accuracy':        performance['performance_metrics']['accuracy'],
         'f1_score':        performance['performance_metrics']['f1_score'],
-        'triggered_by':    'scheduler',
+        'triggered_by':    triggered_by,
     })
 
-    # ── Purge consumed training data ──────────────────────────────────────
-    _clear_safe_samples_file()
-    _clear_csv_samples()
-    print("[RETRAIN] Purged training data.")
+    # NOTE: Training data is intentionally NOT purged so it accumulates
+    # across retrains. Each retrain builds on all historical data.
+    print("[RETRAIN] Training data retained for future retrains.")
 
     return True, 'Retrain completed successfully.', {
-        'scam_samples':    len(scam_texts),
-        'safe_samples':    len(safe_texts),
+        'scam_samples':    total_scam,
+        'safe_samples':    total_safe,
         'keyword_samples': counts['keywords'],
         'accuracy':        performance['performance_metrics']['accuracy'],
         'f1_score':        performance['performance_metrics']['f1_score'],
@@ -640,17 +724,21 @@ def run_retrain(triggered_by: str = 'scheduler'):
             print("[RETRAIN] Already running — skipping.")
             return
         retrain_status['state']   = 'running'
-        retrain_status['message'] = 'Retraining in progress…'
+        retrain_status['message'] = ''   # clear previous error/success message
 
+    success, message, stats = False, 'Unknown error during retrain.', {}
     try:
-        success, message, stats = _do_retrain()
-        if triggered_by == 'manual' and success:
-            logs = list(db.collection('retrain_log').order_by(
-                'retrained_at', direction=firestore.Query.DESCENDING
-            ).limit(1).stream())
-            if logs:
-                logs[0].reference.update({'triggered_by': 'manual'})
-
+        success, message, stats = _do_retrain(triggered_by)
+    except MemoryError:
+        message = 'Out of memory — dataset too large. Reduce keywords or CSV samples and try again.'
+        print(f"[RETRAIN] MemoryError: {message}")
+    except Exception as e:
+        import traceback
+        message = str(e)
+        print(f"[RETRAIN] Exception: {e}")
+        print(traceback.format_exc())
+    finally:
+        # Always reset state — prevents stuck-on-loading regardless of what happened
         with retrain_lock:
             retrain_status.update({
                 'state':    'success' if success else 'error',
@@ -658,10 +746,6 @@ def run_retrain(triggered_by: str = 'scheduler'):
                 'last_run': datetime.datetime.utcnow().isoformat() + 'Z',
                 **(stats if success else {}),
             })
-    except Exception as e:
-        print(f"[RETRAIN] Exception: {e}")
-        with retrain_lock:
-            retrain_status.update({'state': 'error', 'message': str(e)})
 
 
 # ---------------------------------------------------------------------------
@@ -711,13 +795,13 @@ def _cache_invalidate(key: str):
 # ---------------------------------------------------------------------------
 def parse_predict_result(result: str):
     if 'Keyword Match' in result:
-        return True, 99.0, 'Keyword'
+        return True, 100.0, 'Keyword'
     if result.startswith("SCAM (Detected via LSH"):
-        # LSH is a binary detector — it fires when Jaccard similarity >= threshold (0.5).
-        # The actual similarity is unknown without storing original MinHash objects.
-        # We report the threshold as the minimum guaranteed similarity score,
-        # scaled to a probability: threshold * 100, floored at 50%.
-        lsh_prob = round(model.lsh_threshold * 100) if model else 50.0
+        # Extract actual similarity if present, otherwise fall back to threshold
+        sim_match = re.search(r'Similarity:\s*([\d.]+)%', result)
+        if sim_match:
+            return True, round(float(sim_match.group(1)), 2), "LSH"
+        lsh_prob = round(model.lsh_threshold * 100) if model else 90.0
         return True, lsh_prob, "LSH"
     match = re.search(r'Confidence:\s*([\d.]+)%', result)
     if match:
@@ -745,23 +829,9 @@ def detect_scam():
 
     is_scam, prob, method = parse_predict_result(result)
 
-    if is_scam:
-        # ── Novel scam: add band hashes to in-memory cache only ───────────
-        # Only NLP-detected scams are novel. We keep hashes in memory;
-        # they persist to Firestore only via /api/report (user-submitted).
-        # This avoids 20 Firestore writes per auto-detection.
-        if method == 'NLP':
-            try:
-                m     = model._get_minhash(msg)
-                bands = list(model._get_bands(m))
-                already_indexed = any(bh in lsh_cache for _, bh in bands)
-                if not already_indexed:
-                    for _, band_hash in bands:
-                        lsh_cache.add(band_hash)   # memory only — no Firestore write
-            except Exception as e:
-                print(f"[WARN] Could not index novel scam bands: {e}")
+    print(f"[DETECT] is_scam={is_scam} method={method} prob={prob} latency={latency:.4f}s msg={msg[:80]!r}")
 
-    else:
+    if not is_scam:
         # ── Safe message: store in local file (zero Firestore cost) ───────
         try:
             _append_safe_sample(msg)
@@ -782,20 +852,28 @@ def get_metrics():
         return jsonify({'error': 'Model not loaded. Check that scam_stop_engine.joblib exists on the server.'}), 503
 
     # Build live LSH config regardless of whether performance_data exists
+    try:
+        vocab_size = len(model.vectorizer.vocabulary_) \
+            if hasattr(model, 'vectorizer') and hasattr(model.vectorizer, 'vocabulary_') else '—'
+    except Exception:
+        vocab_size = '—'
+
+    try:
+        avg_query_ms = _measure_query_time(model)
+    except Exception:
+        avg_query_ms = 0.0
+
     live_lsh = {
         'hash_functions_k':      model.num_perm,
         'bands_b':               _lsh_b(model),
         'rows_per_band_r':       _lsh_r(model),
         'lsh_threshold':         model.lsh_threshold,
-        'minhash_shingle_size':  'Word-based (1-gram)',
-        'vocabulary_size_tfidf': len(model.vectorizer.vocabulary_)
-                                 if hasattr(model, 'vectorizer') and
-                                    hasattr(model.vectorizer, 'vocabulary_') else '—',
-        'avg_query_time_ms':     _measure_query_time(model),
+        'minhash_shingle_size':  f'Character-based ({SHINGLE_SIZE}-gram)',
+        'vocabulary_size_tfidf': vocab_size,
+        'avg_query_time_ms':     avg_query_ms,
     }
 
     if not cached_metrics:
-        # Model is loaded but has never been retrained — return LSH config only
         return jsonify({
             'lsh_configurations': live_lsh,
             'performance_metrics': None,
@@ -814,8 +892,23 @@ def get_metrics():
     return jsonify(response)
 
 
+@app.route('/api/train', methods=['POST'])
+# @limiter.limit("3 per hour")
+def trigger_initial_train():
+    """
+    Triggers an initial training run.
+    Semantically distinct from /api/retrain — intended for first-time setup
+    when no model has been trained yet. Logs triggered_by='initial' to Firestore.
+    """
+    with retrain_lock:
+        if retrain_status['state'] == 'running':
+            return jsonify({'error': 'Training already in progress.'}), 409
+    threading.Thread(target=run_retrain, args=('initial',), daemon=True).start()
+    return jsonify({'status': 'Initial training started.', 'message': 'Poll /api/retrain/status for updates.'})
+
+
 @app.route('/api/retrain', methods=['POST'])
-@limiter.limit("3 per hour")
+# @limiter.limit("3 per hour")
 def trigger_retrain():
     with retrain_lock:
         if retrain_status['state'] == 'running':
@@ -845,6 +938,59 @@ def get_retrain_status():
         print(f"[WARN] Could not fetch retrain log: {e}")
 
     return jsonify({**retrain_status, 'history': logs})
+
+
+@app.route('/api/retrain/rollback', methods=['POST'])
+def rollback_model():
+    """Restore the model from the backup saved before the last retrain."""
+    global model, cached_metrics
+
+    if not os.path.exists(MODEL_BACKUP_PATH):
+        return jsonify({'error': 'No backup found. A retrain must complete at least once before rollback is available.'}), 404
+
+    with retrain_lock:
+        if retrain_status['state'] == 'running':
+            return jsonify({'error': 'Retrain in progress — cannot rollback now.'}), 409
+
+    try:
+        import shutil
+        # Swap: move current → temp, backup → current, temp → backup
+        # This way the backup becomes the previous-current for a re-rollback.
+        tmp_path = MODEL_PATH + '.tmp'
+        shutil.copy2(MODEL_PATH, tmp_path)
+        shutil.copy2(MODEL_BACKUP_PATH, MODEL_PATH)
+        shutil.move(tmp_path, MODEL_BACKUP_PATH)
+
+        restored = load_model()
+        if restored is None:
+            # Undo the swap if load failed
+            shutil.copy2(MODEL_BACKUP_PATH, MODEL_PATH)
+            return jsonify({'error': 'Backup file exists but could not be loaded. Rollback aborted.'}), 500
+
+        model          = restored
+        cached_metrics = model.performance_data if hasattr(model, 'performance_data') else None
+        _cache_invalidate('metrics')
+
+        print("[ROLLBACK] Model restored from backup successfully.")
+        return jsonify({
+            'status':  'Rollback successful. Previous model is now active.',
+            'has_metrics': cached_metrics is not None,
+        })
+    except Exception as e:
+        print(f"[ROLLBACK] Failed: {e}")
+        return jsonify({'error': f'Rollback failed: {str(e)}'}), 500
+
+
+@app.route('/api/retrain/backup/status', methods=['GET'])
+def backup_status():
+    """Check whether a model backup exists and when it was last modified."""
+    if not os.path.exists(MODEL_BACKUP_PATH):
+        return jsonify({'backup_available': False})
+    mtime = os.path.getmtime(MODEL_BACKUP_PATH)
+    return jsonify({
+        'backup_available': True,
+        'backup_saved_at':  datetime.datetime.utcfromtimestamp(mtime).isoformat() + 'Z',
+    })
 
 
 @app.route('/api/samples/bulk', methods=['POST', 'OPTIONS'])
@@ -882,31 +1028,60 @@ def add_samples_bulk():
 @app.route('/api/samples/status', methods=['GET'])
 def get_samples_status():
     """Returns the count of CSV samples currently cached on the server."""
-    with _csv_lock:
-        return jsonify({
-            'csv_scam': len(csv_scam_texts),
-            'csv_safe': len(csv_safe_texts),
-            'total':    len(csv_scam_texts) + len(csv_safe_texts),
-        })
+    scam_count = _count_csv_lines(CSV_SCAM_PATH)
+    safe_count = _count_csv_lines(CSV_SAFE_PATH)
+    return jsonify({
+        'csv_scam': scam_count,
+        'csv_safe': safe_count,
+        'total':    scam_count + safe_count,
+    })
 
 
 @app.route('/api/stats/flag', methods=['POST'])
 def record_flag():
-    """Called by the browser extension when a scam is detected on a page."""
-    data = request.get_json(silent=True) or {}
-
-    # Only increment the global counter — no per-detection text is stored.
-    # Scam text is NOT persisted here; training data comes from reports,
-    # keywords, and admin CSV uploads only.
-    db.collection('stats').document('global').set({
-        'flagged':         firestore.Increment(1),
-        'last_flagged_at': firestore.SERVER_TIMESTAMP,
-    }, merge=True)
-
     return jsonify({'status': 'recorded'})
 
 
-@app.route('/api/report', methods=['POST'])
+@app.route('/api/flag-scam', methods=['POST'])
+@limiter.limit("30 per minute; 200 per hour")
+def flag_scam():
+    """
+    User-initiated flag from the extension badge modal or detection log modal.
+    Stores the message in the `user_flagged` Firestore collection so it is
+    picked up as a SCAM training sample on the next retrain cycle.
+    """
+    data = request.get_json(silent=True) or {}
+    text = (data.get('text') or data.get('message') or '').strip()
+    url  = (data.get('url') or '').strip()
+
+    if not text:
+        return jsonify({'error': 'No text provided.'}), 400
+
+    h = hashlib.sha256(text.encode('utf-8')).hexdigest()
+
+    db.collection('user_flagged').document(h).set({
+        'text':       text[:1000],
+        'url':        url or None,
+        'flagged_at': firestore.SERVER_TIMESTAMP,
+        'label':      1,   # scam
+    }, merge=True)   # merge=True deduplicates by hash
+
+    # Also insert into the live MinHashLSH index immediately so similar messages
+    # are caught by LSH (with real Jaccard similarity) before the next retrain cycle
+    try:
+        mh  = model._get_minhash(text)
+        key = f'flagged_{h[:16]}'
+        minhashes = getattr(model, 'lsh_minhashes', {})
+        if key not in minhashes:
+            model.lsh.insert(key, mh)
+            minhashes[key] = mh
+            model.lsh_minhashes = minhashes
+    except Exception:
+        pass
+
+    return jsonify({'status': 'flagged', 'hash': h})
+
+
 @limiter.limit("10 per minute; 100 per hour")
 def report_scam():
     data = request.get_json(silent=True) or {}
@@ -948,25 +1123,8 @@ def report_scam():
     # Write the report document first — this is what the user waits for
     _, report_ref = db.collection('reports').add(report_doc)
 
-    # Write LSH band hashes in the background — don't block the response
-    def _write_bands():
-        try:
-            m     = model._get_minhash(msg)
-            bands = list(model._get_bands(m))
-            def write_band(band_idx_hash):
-                band_idx, band_hash = band_idx_hash
-                doc_ref = db.collection(f'lsh_index/band_{band_idx}/hashes').document(band_hash)
-                doc_ref.set({'reported_at': firestore.SERVER_TIMESTAMP}, merge=True)
-                lsh_cache.add(band_hash)
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-                executor.map(write_band, bands)
-        except Exception as e:
-            print(f"[WARN] Background LSH write failed: {e}")
-
-    threading.Thread(target=_write_bands, daemon=True).start()
-
     return jsonify({
-        'status':        'Report submitted and LSH index updated',
+        'status':        'Report submitted successfully',
         'report_id':     report_ref.id,
         'report_status': 'pending',
     })
@@ -1020,10 +1178,23 @@ def health():
         'has_metrics':       cached_metrics is not None,
         'firebase_ok':       firebase_ok,
         'keywords_cached':   len(keyword_cache),
-        'lsh_hashes_cached': len(lsh_cache),
-        'csv_scam_cached':   len(csv_scam_texts),
-        'csv_safe_cached':   len(csv_safe_texts),
-        'safe_samples_cached': len(safe_samples_texts),
+        'csv_scam_cached':     _count_csv_lines(CSV_SCAM_PATH),
+        'csv_safe_cached':     _count_csv_lines(CSV_SAFE_PATH),
+        'safe_samples_cached': _count_safe_samples(),
+    })
+
+
+@app.route('/api/model/status', methods=['GET'])
+def model_status():
+    """Model status endpoint — returns whether the model is loaded and ready."""
+    model_file_exists = os.path.exists(MODEL_PATH)
+    return jsonify({
+        'model_exists':     model_file_exists and model is not None,
+        'loaded':           model is not None,
+        'status':           'ready' if model is not None else 'unavailable',
+        'has_metrics':      cached_metrics is not None,
+        'backup_available': os.path.exists(MODEL_BACKUP_PATH),
+        'retrain_state':    retrain_status.get('state', 'idle'),
     })
 
 

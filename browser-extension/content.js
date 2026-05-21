@@ -3,6 +3,7 @@ const MAX_TEXT_LENGTH = 1500;
 const pendingElements = new Set();
 let observer;
 let enabled = true;
+let showDetectionMethod = true;  // controlled by Settings toggle
 
 const platform = getPlatformKey();
 injectStyles(platform);
@@ -21,6 +22,7 @@ function getPlatformKey() {
 async function boot() {
   const settings = await sendMessage({ type: 'get-settings' });
   enabled = settings?.settings?.enabled ?? true;
+  showDetectionMethod = settings?.settings?.showDetectionMethod ?? true;
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'sync' && changes.enabled) {
@@ -38,6 +40,11 @@ async function boot() {
     if (message.type === 'TOGGLE') {
       enabled = message.enabled;
       enabled ? scanVisibleCandidates() : removeAllMarkers();
+      sendResponse({ ok: true });
+    }
+    if (message.type === 'UPDATE_DETECTION_METHOD') {
+      showDetectionMethod = !!message.show;
+      refreshBadgeLabels();
       sendResponse({ ok: true });
     }
   });
@@ -148,15 +155,34 @@ function upsertBadge(element, probability, links = [], detectionMethod = null) {
   badge.className = 'scamstop-marker';
   const rounded = Math.round(probability);
 
-  // Label: "RISK: 92% · NLP" or "RISK: 99% · LSH" or "RISK: 99% · Keyword"
-  const methodLabel = detectionMethod ? ` · ${detectionMethod}` : '';
-  badge.textContent = `RISK: ${rounded}%${methodLabel}`;
-  badge.setAttribute('data-risk', getRiskLevel(rounded));
+  // data-risk stores the risk LEVEL (high/medium/low) for CSS colour
+  // data-score stores the numeric value for refreshBadgeLabels
+  // data-method stores the detection method for refreshBadgeLabels
+  badge.setAttribute('data-risk',   getRiskLevel(rounded));
+  badge.dataset.score  = String(rounded);
+  badge.dataset.method = detectionMethod || '';
+
+  badge.textContent = buildBadgeLabel(rounded, detectionMethod);
   badge.addEventListener('click', (e) => {
     e.stopPropagation();
     showFullContentModal(extractText(element), rounded, links, detectionMethod);
   });
   element.appendChild(badge);
+}
+
+function buildBadgeLabel(rounded, detectionMethod) {
+  const methodLabel = (showDetectionMethod && detectionMethod) ? ` · ${detectionMethod}` : '';
+  return `RISK: ${rounded}%${methodLabel}`;
+}
+
+function refreshBadgeLabels() {
+  document.querySelectorAll('.scamstop-marker').forEach(badge => {
+    const raw     = badge.dataset.score;
+    const rounded = (raw !== undefined && raw !== '') ? parseInt(raw, 10) : null;
+    if (rounded === null || isNaN(rounded)) return;
+    const method  = badge.dataset.method || null;
+    badge.textContent = buildBadgeLabel(rounded, method);
+  });
 }
 
 function extractText(element) {
@@ -418,6 +444,28 @@ function showFullContentModal(text, risk, links = [], detectionMethod = null) {
   closeBtn.style.cssText = 'width:100%;padding:10px;cursor:pointer;margin-top:10px;';
   closeBtn.addEventListener('click', () => root.remove());
 
+  // ── Flag as Scam button ───────────────────────────────────────────────────
+  const flagBtn = document.createElement('button');
+  flagBtn.textContent = 'Flag as Scam';
+  flagBtn.style.cssText = 'width:100%;padding:10px;cursor:pointer;margin-top:8px;background:#ef4444;color:white;border:none;border-radius:6px;font-weight:bold;font-size:13px;';
+  flagBtn.addEventListener('click', () => {
+    flagBtn.disabled = true;
+    flagBtn.textContent = 'Flagging…';
+    sendMessage({ type: 'flag-scam', text, url: location.hostname }).then(res => {
+      if (res?.ok) {
+        flagBtn.textContent = '✓ Flagged — thank you';
+        flagBtn.style.background = '#16a34a';
+      } else {
+        flagBtn.textContent = '✗ Failed — try again';
+        flagBtn.disabled = false;
+      }
+    }).catch(() => {
+      flagBtn.textContent = '✗ Failed — try again';
+      flagBtn.disabled = false;
+    });
+  });
+
+  modal.appendChild(flagBtn);
   modal.appendChild(closeBtn);
   root.appendChild(modal);
 

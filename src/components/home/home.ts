@@ -114,14 +114,41 @@ export class Home implements OnInit {
 
   openDetection(item: Detection): void {
     this.selectedDetection.set(item);
+    this.flagState.set('idle');
   }
 
   closeDetection(): void {
     this.selectedDetection.set(null);
+    this.flagState.set('idle');
   }
 
   goToReportFromDetection(message: string): void {
     this.closeDetection();
     this.router.navigateByUrl(`/main/report?message=${encodeURIComponent(message)}`);
+  }
+
+  // ── Flag as scam ───────────────────────────────────────────────────────────
+
+  flagState = signal<'idle' | 'loading' | 'done' | 'error'>('idle');
+
+  async flagDetection(message: string, platform: string): Promise<void> {
+    this.flagState.set('loading');
+    try {
+      await this.sendToBackground({ type: 'flag-scam', text: message, url: platform });
+      this.flagState.set('done');
+    } catch {
+      this.flagState.set('error');
+    }
+  }
+
+  private sendToBackground(msg: object): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const chrome = (window as any).chrome;
+      if (!chrome?.runtime?.sendMessage) { reject(new Error('Not extension context')); return; }
+      chrome.runtime.sendMessage(msg, (res: any) => {
+        if (chrome.runtime.lastError) { reject(new Error(chrome.runtime.lastError.message)); return; }
+        res?.ok ? resolve(res) : reject(new Error(res?.error ?? 'Unknown error'));
+      });
+    });
   }
 }

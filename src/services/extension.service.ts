@@ -5,12 +5,14 @@ import { environment } from '../environments/environment';
 
 const DEFAULT_SETTINGS = {
   enabled: false,
-  apiBase: environment.apiUrl
+  apiBase: environment.apiUrl,
+  showDetectionMethod: true,
 };
 
 export interface ExtensionSettings {
   enabled: boolean;
   apiBase: string;
+  showDetectionMethod: boolean;
 }
 
 export interface ExtensionStats {
@@ -84,7 +86,7 @@ export class ExtensionService {
 
     // Settings live in sync; stats + detections live in local
     const [sync, local] = await Promise.all([
-      this.chrome.storage.sync.get(['enabled', 'apiBase']),
+      this.chrome.storage.sync.get(['enabled', 'apiBase', 'showDetectionMethod']),
       this.chrome.storage.local.get(['stats', 'recentDetections']),
     ]);
 
@@ -92,6 +94,9 @@ export class ExtensionService {
       settings: {
         enabled: typeof sync.enabled === 'boolean' ? sync.enabled : DEFAULT_SETTINGS.enabled,
         apiBase: sync.apiBase || DEFAULT_SETTINGS.apiBase,
+        showDetectionMethod: typeof sync.showDetectionMethod === 'boolean'
+          ? sync.showDetectionMethod
+          : DEFAULT_SETTINGS.showDetectionMethod,
       },
       stats: local.stats || { scanned: 0, flagged: 0, safe: 0 },
       detections: local.recentDetections || [],
@@ -129,6 +134,17 @@ export class ExtensionService {
         }
       });
     }
+  }
+
+  async setShowDetectionMethod(show: boolean): Promise<void> {
+    if (!this.isExtensionContext()) return;
+    // Send through background so it can broadcast to all tabs in real time
+    await new Promise<void>((resolve) => {
+      this.chrome.runtime.sendMessage(
+        { type: 'set-show-detection-method', show: !!show },
+        () => resolve()
+      );
+    });
   }
 
   async setApiBase(apiBase: string): Promise<boolean> {

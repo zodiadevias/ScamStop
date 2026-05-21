@@ -396,6 +396,29 @@ h3 {
   gap: 8px;
 }
 
+.modal-flag-btn {
+  border: none;
+  border-radius: 8px;
+  background: #ef4444;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+
+.modal-flag-btn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.modal-flag-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #16a34a;
+}
+
 .modal-report-btn {
   border: none;
   border-radius: 8px;
